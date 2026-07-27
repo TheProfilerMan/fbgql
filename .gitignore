@@ -1,0 +1,34 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+
+# Tooling
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Secrets & run artifacts — never commit cookies/sessions/output
+cookies*.json
+*.pkl
+auth_session*.json
+.env
+out/
+storage/            # Apify local storage
+apify_storage/
+
+# local debug dumps
+debug_timeline_raw.txt
+debug_timeline.py
+
+# Apify local run state (contains session secrets in INPUT.json)
+apify/storage/
+apify/.venv/
+
+# Local capture dumps (doc_ids drift; config.py is source of truth)
+captured_queries.json

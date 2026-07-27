@@ -1,0 +1,40 @@
+# Docker build context = repo root (the Apify actor's Dockerfile COPYs ./src + ./apify/src).
+# Keep secrets, local run state, and dev cruft OUT of every image build.
+
+# --- Secrets & session state (NEVER build these in) -------------------------
+cookies*.json
+auth_session*.json
+*.pkl
+.env
+storage/
+apify_storage/
+apify/storage/
+captured_queries.json
+
+# --- Virtualenvs -------------------------------------------------------------
+.venv/
+venv/
+apify/.venv/
+
+# --- Python / tooling caches -------------------------------------------------
+**/__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# --- Not needed at runtime ---------------------------------------------------
+.git/
+.github/
+tests/
+out/
+examples/
+docker/
+debug_*.py
+debug_*.txt
+*.md
+!README.md

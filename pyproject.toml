@@ -1,0 +1,56 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "fbgql"
+version = "0.1.0"
+description = "Clean-room Facebook GraphQL post & comment scraper — library, CLI, and Apify actor."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { file = "LICENSE" }
+authors = [{ name = "Daggega" }]
+keywords = ["facebook", "graphql", "scraper", "comments", "apify"]
+classifiers = [
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "License :: Other/Proprietary License",
+]
+dependencies = [
+    "requests>=2.28",
+    "httpx>=0.27",
+    "click>=8.1",
+]
+
+[project.optional-dependencies]
+# Interactive login helper (one-time, human-driven). NOT needed for scraping/Apify runtime.
+mint = ["selenium>=4.15", "webdriver-manager>=4.0"]
+# Apify actor runtime.
+apify = ["apify>=2.0"]
+# Development / CI.
+dev = ["ruff>=0.6", "pytest>=8.0", "pytest-asyncio>=0.23"]
+
+[project.scripts]
+fbgql = "fbgql.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/bsho5/fbgql"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/fbgql"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+# E501: line length handled by formatter. UP042: keep `str, Enum` (StrEnum is 3.11+
+# only, and the mixin form is intentional for broad interop).
+ignore = ["E501", "UP042"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+addopts = "-q"
