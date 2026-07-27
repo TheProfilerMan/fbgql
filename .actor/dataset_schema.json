@@ -1,0 +1,32 @@
+{
+    "actorSpecification": 1,
+    "views": {
+        "overview": {
+            "title": "Posts overview",
+            "description": "One row per scraped post with coverage.",
+            "transformation": {
+                "fields": [
+                    "post",
+                    "tops",
+                    "replies",
+                    "total_scraped",
+                    "coverage",
+                    "replies_skipped",
+                    "error"
+                ]
+            },
+            "display": {
+                "component": "table",
+                "properties": {
+                    "post": { "label": "Post" },
+                    "tops": { "label": "Top comments" },
+                    "replies": { "label": "Replies" },
+                    "total_scraped": { "label": "Scraped" },
+                    "coverage": { "label": "Coverage" },
+                    "replies_skipped": { "label": "Replies skipped" },
+                    "error": { "label": "Error" }
+                }
+            }
+        }
+    }
+}

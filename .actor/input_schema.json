@@ -1,0 +1,85 @@
+{
+    "title": "Facebook Post & Comment Scraper input",
+    "type": "object",
+    "schemaVersion": 1,
+    "properties": {
+        "pageOrUrl": {
+            "title": "Page or post URL",
+            "type": "string",
+            "description": "A Facebook page handle/URL/numeric id, OR a single post URL (comments only).",
+            "editor": "textfield",
+            "example": "ZainSudan"
+        },
+        "maxPosts": {
+            "title": "Max posts",
+            "type": "integer",
+            "description": "Maximum number of recent posts to scrape (ignored for a single post URL).",
+            "default": 20,
+            "minimum": 1,
+            "maximum": 200
+        },
+        "profile": {
+            "title": "Policy profile",
+            "type": "string",
+            "description": "default = 3 workers + reply cap 1500 (best quality/time); tops_only = no replies; full_replies = always fetch replies (not recommended).",
+            "enum": ["default", "tops_only", "full_replies"],
+            "enumTitles": ["Default (recommended)", "Tops only", "Full replies"],
+            "default": "default",
+            "editor": "select"
+        },
+        "engine": {
+            "title": "Engine",
+            "type": "string",
+            "description": "async = streaming httpx (recommended on Apify); threads = requests thread pool.",
+            "enum": ["async", "threads"],
+            "default": "async",
+            "editor": "select"
+        },
+        "cookies": {
+            "title": "Facebook cookies",
+            "type": "object",
+            "description": "Your logged-in cookie jar as JSON, e.g. {\"c_user\":\"...\",\"xs\":\"...\",\"datr\":\"...\"}. Mint once with `fbgql mint-session`. Stored encrypted.",
+            "editor": "json",
+            "isSecret": true
+        },
+        "proxyConfiguration": {
+            "title": "Proxy",
+            "type": "object",
+            "description": "Use Apify residential proxy, sticky per run. Match the IP region your cookies were minted on where possible.",
+            "editor": "proxy",
+            "default": {
+                "useApifyProxy": true,
+                "apifyProxyGroups": ["RESIDENTIAL"]
+            }
+        },
+        "workers": {
+            "title": "Workers (advanced)",
+            "type": "integer",
+            "description": "Override the worker count from the profile.",
+            "minimum": 1,
+            "maximum": 8,
+            "editor": "number",
+            "sectionCaption": "Advanced"
+        },
+        "replyFbCap": {
+            "title": "Reply cap (advanced)",
+            "type": "integer",
+            "description": "Fetch replies only when a post's FB comment_count is below this. 0 = tops only.",
+            "editor": "number"
+        },
+        "minIntervalSec": {
+            "title": "Min interval seconds (advanced)",
+            "type": "number",
+            "description": "Pause between comment pages, per worker. Higher = gentler on rate limits.",
+            "default": 1.0,
+            "editor": "number"
+        },
+        "megaThreshold": {
+            "title": "Mega threshold (advanced)",
+            "type": "integer",
+            "description": "If set, pin the single heaviest post to a dedicated worker.",
+            "editor": "number"
+        }
+    },
+    "required": ["pageOrUrl", "cookies"]
+}

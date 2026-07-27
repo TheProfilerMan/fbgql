@@ -1,0 +1,15 @@
+{
+    "actorSpecification": 1,
+    "name": "facebook-graphql-comment-scraper",
+    "title": "Facebook Post & Comment Scraper (GraphQL)",
+    "description": "Scrape Facebook page posts and their comments + replies via GraphQL. Bring your own cookies.",
+    "version": "0.1",
+    "buildTag": "latest",
+    "input": "./input_schema.json",
+    "storages": {
+        "dataset": "./dataset_schema.json"
+    },
+    "dockerfile": "../apify/Dockerfile",
+    "minMemoryMbytes": 512,
+    "maxMemoryMbytes": 4096
+}
