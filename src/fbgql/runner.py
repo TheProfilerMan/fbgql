@@ -14,7 +14,7 @@ from dataclasses import dataclass, field
 
 from . import auth, config, parsing, payloads, policy
 from .errors import RequestRejected, SessionInvalid, TransportError
-from .models import Post, ScrapeJob, Session
+from .models import Account, Post, ScrapeJob, Session
 from .transport.sync_http import SyncTransport
 
 _NUMERIC = re.compile(r"^\d+$")
@@ -188,8 +188,13 @@ def job_registry(job: ScrapeJob) -> config.DocIdRegistry:
 
 
 def _resolve_sessions(job: ScrapeJob, transport: SyncTransport) -> tuple[Session, Session | None]:
-    if not job.accounts:
-        raise ValueError("ScrapeJob.accounts is empty — inject at least one Account (cookies)")
+    # Anonymous is the default: no account supplied means logged-out public scraping.
+    # Supplying an account whose cookies lack c_user is still a hard failure — that's a
+    # dead session, not an anonymous one, and it must not silently degrade.
+    if job.anonymous or not job.accounts:
+        # One actor-0 session; no dual-account routing (there are no accounts to route).
+        proxy = job.accounts[0].proxy if job.accounts else None
+        return auth.anonymous_session(Account.anonymous_account(proxy=proxy)), None
     primary = auth.resolve_session(job.accounts[0], transport)
     mega: Session | None = None
     mega_account = next((a for a in job.accounts[1:] if a.role == "mega"), None)
@@ -244,7 +249,8 @@ def prepare(job: ScrapeJob) -> ExecutionPlan:
         registry=registry,
         page_name=page_name,
         resolved_page_id=resolved_id,
-        meta={"mega_used": mega is not None, "mega_post_id": assignment.mega_post_id},
+        meta={"mega_used": mega is not None, "mega_post_id": assignment.mega_post_id,
+              "access_mode": "anonymous" if job.anonymous else "authenticated"},
     )
 
 

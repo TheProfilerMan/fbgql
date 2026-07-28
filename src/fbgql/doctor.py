@@ -29,7 +29,9 @@ def run_checks(account: Account, page: str | None = None) -> list[Check]:
     # 1. Session / fb_dtsg derivation.
     try:
         session = auth.resolve_session(account, transport)
-        checks.append(Check("session", True, f"c_user={session.c_user}, fb_dtsg derived"))
+        detail = ("anonymous (actor 0, no fb_dtsg)" if account.anonymous
+                  else f"c_user={session.c_user}, fb_dtsg derived")
+        checks.append(Check("session", True, detail))
     except SessionInvalid as exc:
         checks.append(Check("session", False, str(exc)))
         return checks  # nothing else will work without a session

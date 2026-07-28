@@ -22,6 +22,9 @@ from .errors import SessionInvalid
 from .models import Account, Session
 from .transport.sync_http import SyncTransport
 
+# Facebook's own logged-out web client identifies as actor "0" (av=0 / __user=0).
+ANONYMOUS_ACTOR = "0"
+
 # Browser-like navigation headers so Facebook returns the real bootstrapped HTML
 # (which contains the DTSG token) rather than a minimal shell.
 BROWSER_HEADERS = {
@@ -91,11 +94,41 @@ def derive_fb_dtsg(cookies: dict[str, str], proxy: str | None = None,
     )
 
 
+def anonymous_session(account: Account | None = None) -> Session:
+    """A logged-out session: actor ``0``, no ``fb_dtsg``, cookies optional.
+
+    Verified 2026-07-28 against the live endpoint: ``www.facebook.com/api/graphql/``
+    serves public timeline, comment, and reply queries to ``av=0``/``__user=0`` with an
+    empty ``fb_dtsg`` and *no cookies at all*. Facebook's own logged-out web client
+    additionally sends an ``lsd`` token; ablation showed it is not required for these
+    persisted queries, so we don't bootstrap one. (``SyncTransport`` keeps a persistent
+    ``requests.Session``, so any anonymous ``datr``/``sb`` Facebook issues during page-id
+    resolution is reused automatically for the rest of the run.)
+
+    Coverage is lower than authenticated mode for login-gated content; see the
+    anonymous-access report for measured numbers.
+    """
+    account = account or Account(anonymous=True)
+    return Session(
+        cookies=dict(account.cookies),
+        fb_dtsg="",
+        c_user=ANONYMOUS_ACTOR,
+        proxy=account.proxy,
+        role=account.role,
+    )
+
+
 def resolve_session(account: Account, transport: SyncTransport | None = None) -> Session:
     """Turn an injected Account into a ready Session (fb_dtsg guaranteed)."""
+    if account.anonymous:
+        return anonymous_session(account)
+
     c_user = account.c_user
     if not c_user:
-        raise SessionInvalid("account cookies missing c_user")
+        raise SessionInvalid(
+            "account cookies missing c_user — pass Account(anonymous=True) "
+            "(or --anonymous) for deliberate logged-out access"
+        )
 
     fb_dtsg = account.fb_dtsg or derive_fb_dtsg(account.cookies, account.proxy, transport)
     return Session(

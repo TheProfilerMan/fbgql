@@ -35,10 +35,10 @@ async def main() -> None:
         if not page_or_url:
             raise ValueError("Input 'pageOrUrl' is required")
 
-        cookies = inp.get("cookies") or {}
-        if not cookies:
-            raise ValueError("Input 'cookies' is required (mint once with `fbgql mint-session`)")
-
+        # This actor is anonymous-only: it scrapes logged-out public content as actor 0
+        # and takes no Facebook credentials. A public actor must never ask users to paste
+        # a session cookie jar into its input. Authenticated scraping still exists in the
+        # library/CLI (``Account(cookies=…)`` / ``--cookies``) for gated content.
         # Resolve a proxy URL. On the platform a configured-but-failing proxy is a hard
         # error (falling back to the actor's datacenter IP would defeat the point). For
         # local dev (`apify run` without login) degrade to a direct connection.
@@ -55,7 +55,7 @@ async def main() -> None:
                     f"Proxy unavailable locally ({exc}); continuing over the direct connection."
                 )
 
-        account = Account(cookies=cookies, proxy=proxy_url, role="primary")
+        account = Account.anonymous_account(proxy=proxy_url)
         is_post = _is_post_url(page_or_url)
         job = ScrapeJob(
             page=None if is_post else page_or_url,
@@ -66,11 +66,15 @@ async def main() -> None:
             workers=inp.get("workers"),
             reply_fb_cap=inp.get("replyFbCap", -1),
             accounts=[account],
+            anonymous=True,
             min_interval_sec=float(inp.get("minIntervalSec", 1.0)),
             mega_threshold=inp.get("megaThreshold"),
         )
 
-        Actor.log.info(f"Scraping {page_or_url} (engine={job.engine}, profile={inp.get('profile')})")
+        Actor.log.info(
+            f"Scraping {page_or_url} (engine={job.engine}, profile={inp.get('profile')}, "
+            "access=anonymous)"
+        )
 
         scraped = 0
         try:
@@ -79,8 +83,13 @@ async def main() -> None:
                 scraped += 1
                 await _maybe_charge("post-scraped")
         except SessionInvalid as exc:
+            # No credentials are involved, so this means Facebook served a login wall —
+            # typically a blocked/flagged IP or a target that isn't publicly visible.
             await Actor.fail(
-                status_message=f"Session invalid — re-mint cookies and retry. ({exc})"
+                status_message=(
+                    "Facebook served a login wall for this target — it may be private, "
+                    f"or this IP is blocked (try a residential proxy). ({exc})"
+                )
             )
             return
 

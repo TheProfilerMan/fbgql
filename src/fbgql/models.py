@@ -40,16 +40,28 @@ class Account:
 
     ``fb_dtsg`` may be None; it is then derived from the cookies at runtime.
     ``proxy`` should be sticky and, ideally, the same IP the cookies were minted on.
+
+    Set ``anonymous=True`` for logged-out access: no cookies are required and the
+    request is made as actor ``0`` with no ``fb_dtsg``. This is deliberately explicit —
+    an account whose cookies merely *lost* ``c_user`` is a dead session, not an
+    anonymous one, and must keep failing loudly.
     """
 
-    cookies: dict[str, str]
+    cookies: dict[str, str] = field(default_factory=dict)
     fb_dtsg: str | None = None
     proxy: str | None = None
     role: str = "primary"  # "primary" | "mega"
+    anonymous: bool = False
 
     @property
     def c_user(self) -> str | None:
         return self.cookies.get("c_user")
+
+    @classmethod
+    def anonymous_account(cls, proxy: str | None = None,
+                          cookies: dict[str, str] | None = None) -> Account:
+        """A logged-out account. ``cookies`` is optional (anonymous datr/sb if you have them)."""
+        return cls(cookies=cookies or {}, proxy=proxy, anonymous=True)
 
 
 @dataclass
@@ -78,7 +90,14 @@ class ScrapeJob:
     workers: int | None = None
     reply_fb_cap: int | None = -1  # sentinel -1 == "use profile preset"
 
+    # Optional. With no accounts the job runs logged-out (the default); supply one to
+    # scrape as a real session and reach login-gated content.
     accounts: list[Account] = field(default_factory=list)
+
+    # Force logged-out mode even when ``accounts`` is populated (ignores them except for
+    # a proxy). Leaving this False and passing no accounts is already anonymous, so this
+    # is only needed to override a configured session. Public content only.
+    anonymous: bool = False
 
     # Dual-account routing (advanced; single-account by default).
     mega_threshold: int | None = None  # pin heaviest post to a "mega" account if set

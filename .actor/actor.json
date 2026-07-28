@@ -2,7 +2,7 @@
     "actorSpecification": 1,
     "name": "facebook-graphql-comment-scraper",
     "title": "Facebook Post & Comment Scraper (GraphQL)",
-    "description": "Scrape Facebook page posts and their comments + replies via GraphQL. Bring your own cookies.",
+    "description": "Scrape Facebook page posts and their comments + replies via GraphQL. No login or cookies required.",
     "version": "0.1",
     "buildTag": "latest",
     "readme": "../apify/README.md",

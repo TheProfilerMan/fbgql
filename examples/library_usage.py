@@ -1,6 +1,6 @@
 """Minimal library usage — run a job and print coverage.
 
-    python examples/library_usage.py ZainSudan cookies.json
+    python examples/library_usage.py facebook cookies.json
 """
 
 from __future__ import annotations
@@ -12,7 +12,7 @@ from fbgql import Account, Profile, ScrapeJob, Scraper
 
 
 def main() -> None:
-    page = sys.argv[1] if len(sys.argv) > 1 else "ZainSudan"
+    page = sys.argv[1] if len(sys.argv) > 1 else "facebook"
     cookies_path = sys.argv[2] if len(sys.argv) > 2 else "cookies.json"
 
     with open(cookies_path, encoding="utf-8") as fh:

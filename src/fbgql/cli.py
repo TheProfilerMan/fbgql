@@ -49,7 +49,11 @@ def main() -> None:
 @click.option("--workers", type=int, default=None, help="Override worker count.")
 @click.option("--reply-cap", type=int, default=None,
               help="Fetch replies only when a post's FB comment_count < this. 0 = tops only.")
-@click.option("--cookies", "cookies_path", required=True, help="Path to cookies JSON.")
+@click.option("--cookies", "cookies_path", default=None,
+              help="Path to cookies JSON. Omit to scrape logged-out (the default).")
+@click.option("--anonymous", is_flag=True,
+              help="Force logged-out scraping even if --cookies is given. Public content "
+                   "only; login/age/geo-gated posts and private groups are unreachable.")
 @click.option("--fb-dtsg", default=None, help="Optional fb_dtsg (else derived from cookies).")
 @click.option("--proxy", default=None, help="Sticky proxy URL for this account.")
 @click.option("--min-interval", type=float, default=1.0, show_default=True)
@@ -57,15 +61,21 @@ def main() -> None:
 @click.option("--mega-threshold", type=int, default=None, help="Pin heaviest post to a mega account.")
 @click.option("--out", "out_path", default=None, help="Write result JSON here (else stdout summary).")
 def scrape(page, post_url, max_posts, profile, engine, workers, reply_cap, cookies_path,
-           fb_dtsg, proxy, min_interval, reply_concurrency, mega_threshold, out_path):
+           anonymous, fb_dtsg, proxy, min_interval, reply_concurrency, mega_threshold, out_path):
     """Scrape a page (or a single post) and write results."""
     from .scraper import Scraper
 
     if not page and not post_url:
         raise click.ClickException("provide --page or --post-url")
 
-    cookies, file_fb_dtsg = _load_session(cookies_path)
-    account = Account(cookies=cookies, fb_dtsg=fb_dtsg or file_fb_dtsg, proxy=proxy, role="primary")
+    # Anonymous by default; pass --cookies to scrape as a real session instead.
+    anonymous = anonymous or not cookies_path
+    if anonymous:
+        accounts = [Account.anonymous_account(proxy=proxy)]
+    else:
+        cookies, file_fb_dtsg = _load_session(cookies_path)
+        accounts = [Account(cookies=cookies, fb_dtsg=fb_dtsg or file_fb_dtsg,
+                            proxy=proxy, role="primary")]
 
     job = ScrapeJob(
         page=page,
@@ -75,13 +85,16 @@ def scrape(page, post_url, max_posts, profile, engine, workers, reply_cap, cooki
         engine=engine,
         workers=workers,
         reply_fb_cap=reply_cap if reply_cap is not None else -1,
-        accounts=[account],
+        accounts=accounts,
+        anonymous=anonymous,
         min_interval_sec=min_interval,
         reply_concurrency=reply_concurrency,
         mega_threshold=mega_threshold,
     )
 
-    click.echo(f"Scraping {page or post_url} · engine={engine} · profile={profile}…", err=True)
+    mode = "anonymous" if anonymous else "authenticated"
+    click.echo(f"Scraping {page or post_url} · engine={engine} · profile={profile} "
+               f"· access={mode}…", err=True)
 
     # Stream per-post progress to stderr so a long run visibly advances instead of
     # looking frozen (a full page can grind through thousands of comments silently).
@@ -126,15 +139,22 @@ def scrape(page, post_url, max_posts, profile, engine, workers, reply_cap, cooki
 
 
 @main.command()
-@click.option("--cookies", "cookies_path", required=True, help="Path to cookies JSON.")
+@click.option("--cookies", "cookies_path", default=None,
+              help="Path to cookies JSON. Omit to check logged-out (the default).")
+@click.option("--anonymous", is_flag=True,
+              help="Force the logged-out check even if --cookies is given.")
 @click.option("--page", default=None, help="Page to validate timeline/comments doc_ids against.")
 @click.option("--proxy", default=None)
-def doctor(cookies_path, page, proxy):
+def doctor(cookies_path, anonymous, page, proxy):
     """Validate the session and that doc_ids still resolve."""
     from .doctor import run_checks
 
-    cookies, file_fb_dtsg = _load_session(cookies_path)
-    account = Account(cookies=cookies, fb_dtsg=file_fb_dtsg, proxy=proxy)
+    anonymous = anonymous or not cookies_path
+    if anonymous:
+        account = Account.anonymous_account(proxy=proxy)
+    else:
+        cookies, file_fb_dtsg = _load_session(cookies_path)
+        account = Account(cookies=cookies, fb_dtsg=file_fb_dtsg, proxy=proxy)
     checks = run_checks(account, page)
     all_ok = True
     for c in checks:

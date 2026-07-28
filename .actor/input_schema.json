@@ -8,7 +8,7 @@
             "type": "string",
             "description": "A Facebook page handle/URL/numeric id, OR a single post URL (comments only).",
             "editor": "textfield",
-            "example": "ZainSudan"
+            "example": "facebook"
         },
         "maxPosts": {
             "title": "Max posts",
@@ -22,8 +22,16 @@
             "title": "Policy profile",
             "type": "string",
             "description": "default = 3 workers + reply cap 1500 (best quality/time); tops_only = no replies; full_replies = always fetch replies (not recommended).",
-            "enum": ["default", "tops_only", "full_replies"],
-            "enumTitles": ["Default (recommended)", "Tops only", "Full replies"],
+            "enum": [
+                "default",
+                "tops_only",
+                "full_replies"
+            ],
+            "enumTitles": [
+                "Default (recommended)",
+                "Tops only",
+                "Full replies"
+            ],
             "default": "default",
             "editor": "select"
         },
@@ -31,25 +39,23 @@
             "title": "Engine",
             "type": "string",
             "description": "async = streaming httpx (recommended on Apify); threads = requests thread pool.",
-            "enum": ["async", "threads"],
+            "enum": [
+                "async",
+                "threads"
+            ],
             "default": "async",
             "editor": "select"
-        },
-        "cookies": {
-            "title": "Facebook cookies",
-            "type": "object",
-            "description": "Your logged-in cookie jar as JSON, e.g. {\"c_user\":\"...\",\"xs\":\"...\",\"datr\":\"...\"}. Mint once with `fbgql mint-session`. Stored encrypted.",
-            "editor": "json",
-            "isSecret": true
         },
         "proxyConfiguration": {
             "title": "Proxy",
             "type": "object",
-            "description": "Use Apify residential proxy, sticky per run. Match the IP region your cookies were minted on where possible.",
+            "description": "Use Apify residential proxy, sticky per run. With no account involved the IP is the only thing Facebook can throttle, so a residential proxy is the main reliability lever.",
             "editor": "proxy",
             "default": {
                 "useApifyProxy": true,
-                "apifyProxyGroups": ["RESIDENTIAL"]
+                "apifyProxyGroups": [
+                    "RESIDENTIAL"
+                ]
             }
         },
         "workers": {
@@ -81,5 +87,7 @@
             "editor": "number"
         }
     },
-    "required": ["pageOrUrl", "cookies"]
+    "required": [
+        "pageOrUrl"
+    ]
 }

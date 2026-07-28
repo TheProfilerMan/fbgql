@@ -32,3 +32,10 @@ apify/.venv/
 
 # Local capture dumps (doc_ids drift; config.py is source of truth)
 captured_queries.json
+
+# local reports
+reports/
+
+# local md
+LEGAL.md
+LICENSE

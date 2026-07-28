@@ -1,12 +1,14 @@
 from __future__ import annotations
 
+import base64
 import json
 
 import pytest
 
-from fbgql import auth
+from fbgql import auth, payloads, runner
 from fbgql.cli import _load_session
 from fbgql.errors import SessionInvalid
+from fbgql.models import Account, ScrapeJob
 
 
 class _FakeGet:
@@ -38,6 +40,80 @@ def test_derive_fb_dtsg_logged_out():
     t = _FakeGet('<form id="login_form"><input name="email"></form>')
     with pytest.raises(SessionInvalid, match="logged-out"):
         auth.derive_fb_dtsg({"c_user": "1", "xs": "y"}, transport=t)
+
+
+def test_anonymous_session_shape():
+    """Logged-out session is actor 0 with no fb_dtsg — verified against live FB 2026-07-28."""
+    s = auth.anonymous_session()
+    assert s.c_user == "0"
+    assert s.fb_dtsg == ""
+    assert s.cookies == {}
+
+
+def test_anonymous_session_keeps_proxy_and_cookies():
+    acct = Account.anonymous_account(proxy="http://p:1", cookies={"datr": "d"})
+    s = auth.anonymous_session(acct)
+    assert (s.c_user, s.fb_dtsg, s.proxy, s.cookies) == ("0", "", "http://p:1", {"datr": "d"})
+
+
+def test_resolve_session_anonymous_flag_skips_c_user_gate():
+    s = auth.resolve_session(Account(cookies={}, anonymous=True))
+    assert s.c_user == "0"
+
+
+def test_resolve_session_missing_c_user_still_fails_loudly():
+    """A session that merely LOST c_user is dead, not anonymous — must not degrade silently."""
+    with pytest.raises(SessionInvalid, match="anonymous"):
+        auth.resolve_session(Account(cookies={"datr": "d"}))
+
+
+def test_anonymous_payload_shape_matches_logged_out_client():
+    """av/__user must be "0" and fb_dtsg empty — the shape proven to work anonymously."""
+    form = payloads.comments_payload(
+        feedback_id="ZmVlZGJhY2s6MQ==", cursor=None,
+        c_user=auth.anonymous_session().c_user,
+        fb_dtsg=auth.anonymous_session().fb_dtsg, doc_id="123",
+    )
+    assert form["av"] == "0"
+    assert form["__user"] == "0"
+    assert form["fb_dtsg"] == ""
+
+
+def test_feedback_id_is_base64_of_feedback_colon_post_id():
+    """The anonymous path needs no bootstrap: feedback_id is derivable from post_id alone."""
+    assert runner.feedback_id_for_post("1543860544451858") == (
+        base64.b64encode(b"feedback:1543860544451858").decode()
+    )
+
+
+def test_anonymous_job_needs_no_accounts():
+    primary, mega = runner._resolve_sessions(ScrapeJob(page="x", anonymous=True), transport=None)
+    assert primary.c_user == "0"
+    assert mega is None
+
+
+def test_no_accounts_defaults_to_anonymous():
+    """Anonymous is the DEFAULT: a job with no accounts runs logged-out, not an error."""
+    primary, mega = runner._resolve_sessions(ScrapeJob(page="x"), transport=None)
+    assert primary.c_user == "0"
+    assert primary.fb_dtsg == ""
+    assert mega is None
+
+
+def test_anonymous_flag_overrides_supplied_accounts():
+    """anonymous=True forces logged-out even when a session was configured."""
+    job = ScrapeJob(page="x", anonymous=True,
+                    accounts=[Account(cookies={"c_user": "1", "xs": "y"}, proxy="http://p:1")])
+    primary, _ = runner._resolve_sessions(job, transport=None)
+    assert primary.c_user == "0"
+    assert primary.proxy == "http://p:1"   # proxy is still honoured
+
+
+def test_supplied_account_missing_c_user_still_raises():
+    """The safety property survives the default flip: a dead session is not anonymous."""
+    job = ScrapeJob(page="x", accounts=[Account(cookies={"datr": "d"})])
+    with pytest.raises(SessionInvalid, match="anonymous"):
+        runner._resolve_sessions(job, transport=None)
 
 
 def test_load_session_flat(tmp_path):
