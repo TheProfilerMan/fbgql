@@ -5,6 +5,7 @@
     "description": "Scrape Facebook page posts and their comments + replies via GraphQL. Bring your own cookies.",
     "version": "0.1",
     "buildTag": "latest",
+    "readme": "../apify/README.md",
     "input": "./input_schema.json",
     "output": "./output_schema.json",
     "storages": {
