@@ -3,8 +3,8 @@
 Clean-room Facebook **GraphQL** post & comment scraper — usable as a **library**, a
 **CLI**, and a **public Apify actor**. One engine, many callers.
 
-> Working name `fbgql` — rename before publishing. Proprietary/clean-room: see
-> [`LICENSE`](LICENSE) and [`LEGAL.md`](LEGAL.md).
+> Working name `fbgql` — rename before publishing. [MIT license](LICENSE); compliance
+> notes in [`LEGAL.md`](LEGAL.md).
 
 ## What it does
 
