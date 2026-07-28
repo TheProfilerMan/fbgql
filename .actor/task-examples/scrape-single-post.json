@@ -1,0 +1,9 @@
+{
+    "title": "Scrape single post thread",
+    "description": "Deep-dive one viral post — pass the full post permalink as pageOrUrl.",
+    "input": {
+        "pageOrUrl": "https://www.facebook.com/yourpage/posts/1234567890",
+        "profile": "default",
+        "engine": "async"
+    }
+}

@@ -1,7 +1,7 @@
 """Apify actor entrypoint — a thin adapter over fbgql.Scraper.
 
-Reads the actor input, builds a ScrapeJob, streams post results to the default
-Dataset, and (optionally) charges per scraped post for pay-per-event monetization.
+Reads the actor input, builds a ScrapeJob, and streams post results to the default
+Dataset. Free to use — no developer fee; users only pay Apify platform usage.
 All scraping logic lives in the fbgql core package.
 """
 
@@ -17,14 +17,6 @@ _POST_MARKERS = ("/posts/", "story_fbid", "/permalink/", "/videos/", "pfbid")
 
 def _is_post_url(value: str) -> bool:
     return value.startswith("http") and any(m in value for m in _POST_MARKERS)
-
-
-async def _maybe_charge(event: str) -> None:
-    """Charge a pay-per-event unit; ignore if monetization isn't configured."""
-    try:
-        await Actor.charge(event_name=event)
-    except Exception as exc:  # noqa: BLE001 - charging is best-effort at runtime
-        Actor.log.debug(f"charge({event}) skipped: {exc}")
 
 
 async def main() -> None:
@@ -60,7 +52,7 @@ async def main() -> None:
         job = ScrapeJob(
             page=None if is_post else page_or_url,
             post_url=page_or_url if is_post else None,
-            max_posts=int(inp.get("maxPosts", 20)),
+            max_posts=int(inp.get("maxPosts", 1)),
             profile=Profile(inp.get("profile", "default")),
             engine=inp.get("engine", "async"),
             workers=inp.get("workers"),
@@ -81,7 +73,6 @@ async def main() -> None:
             async for post in Scraper().astream(job):
                 await Actor.push_data(post.to_dict())
                 scraped += 1
-                await _maybe_charge("post-scraped")
         except SessionInvalid as exc:
             # No credentials are involved, so this means Facebook served a login wall —
             # typically a blocked/flagged IP or a target that isn't publicly visible.

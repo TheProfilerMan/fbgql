@@ -1,0 +1,10 @@
+{
+    "title": "Single post — smallest run",
+    "description": "One recent post from Meta's public page. Good first run to verify the scraper works and to see what a single post costs on your plan.",
+    "input": {
+        "pageOrUrl": "facebook",
+        "maxPosts": 1,
+        "profile": "default",
+        "engine": "async"
+    }
+}

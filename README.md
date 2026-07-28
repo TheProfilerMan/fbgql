@@ -67,12 +67,11 @@ the I/O loop differs.
 The default path is anonymous, so it needs **no browser and no login**:
 
 ```bash
-# Quickest first run — 1 post, top-level comments only
-PROFILE=tops_only ./run.sh facebook 1
+./run.sh doctor           # smoke test — resolves the page + all 3 doc_ids, no scraping
+./run.sh facebook 1       # smallest real scrape, logged out
 
 ./run.sh                  # scrape the default page (PAGE/POSTS defaults), logged out
 ./run.sh <page> 30        # page + post count
-./run.sh doctor           # check doc_ids still resolve
 
 AUTH=1 ./run.sh           # authenticated instead (mints cookies if needed)
 ./run.sh login            # just mint/refresh cookies
@@ -82,10 +81,16 @@ Override via env: `PAGE=… POSTS=… PROFILE=… ENGINE=… OUT=… PROXY=… .
 Only `AUTH=1`, `login`, and `capture` need a display for the browser step; the default
 anonymous path runs fine in containers.
 
-**Budget the run time.** Comments are paginated to exhaustion, so wall-clock scales with
-how busy the target is, not with post count alone. Measured on `facebook` (Meta's own
-page, ~1 000 comments/post): **~5 min per post** on the `default` profile. Busy pages are
-where `tops_only`, `--reply-cap`, and a lower `--posts` earn their keep.
+**Budget the run time.** There is no artificial page cap — comments are paginated to
+exhaustion — so wall-clock scales with how many comments the target has, not with post
+count alone. Don't extrapolate from someone else's page; measure your own. One data point
+for calibration: a single `facebook` (Meta's own page) post, logged out, returned **861
+comments in 295 s** on 2026-07-28 — that page averages ~1 000 comments per post, so it is
+close to a worst case. Use `./run.sh doctor` when you only want to confirm the plumbing.
+
+Note that `tops_only` is **not** a speed knob: it sets `workers=1`, so it serialises posts
+and can be *slower* than `default` on a multi-post run despite skipping replies. To trade
+coverage for time, keep the `default` profile and use `--reply-cap` (or lower `--posts`).
 
 ## Install
 

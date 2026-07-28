@@ -1,0 +1,10 @@
+{
+    "title": "Monitor page comments",
+    "description": "Scrape the 5 most recent posts from a public Facebook page for brand monitoring.",
+    "input": {
+        "pageOrUrl": "yourbrand",
+        "maxPosts": 5,
+        "profile": "default",
+        "engine": "async"
+    }
+}

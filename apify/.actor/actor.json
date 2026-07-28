@@ -1,20 +1,29 @@
 {
-  "actorSpecification": 1,
-  "name": "facebook-graphql-comment-scraper",
-  "title": "Facebook Post & Comment Scraper (GraphQL)",
-  "description": "Scrape Facebook page posts and their comments + replies via GraphQL. No login or cookies required.",
-  "version": "0.1",
-  "buildTag": "latest",
-  "meta": {
-    "templateId": "python-start"
-  },
-  "readme": "../README.md",
-  "input": "./input_schema.json",
-  "output": "./output_schema.json",
-  "storages": {
-    "dataset": "./dataset_schema.json"
-  },
-  "dockerfile": "../Dockerfile",
-  "minMemoryMbytes": 512,
-  "maxMemoryMbytes": 4096
+    "actorSpecification": 1,
+    "name": "facebook-comment-scraper",
+    "title": "Facebook Comment Scraper",
+    "description": "Free Apify Facebook comments scraper — extract public post comments, replies, authors & reactions as JSON. No login, no cookies, no developer fee. Only small Apify platform usage (compute + proxy). Clone github.com/bsho5/fbgql to run locally for free.",
+    "seoTitle": "Free Facebook Comments Scraper | Apify",
+    "seoDescription": "Free Apify Facebook comments scraper. No login or cookies. $0 developer fee — only small Apify compute & proxy costs. Export comments & replies to JSON/CSV.",
+    "version": "0.2",
+    "buildTag": "latest",
+    "categories": ["SOCIAL_MEDIA", "DEVELOPER_TOOLS"],
+    "exampleRunInput": {
+        "pageOrUrl": "facebook",
+        "maxPosts": 1,
+        "profile": "default",
+        "engine": "async"
+    },
+    "meta": {
+        "templateId": "python-start"
+    },
+    "readme": "../README.md",
+    "input": "./input_schema.json",
+    "output": "./output_schema.json",
+    "storages": {
+        "dataset": "./dataset_schema.json"
+    },
+    "dockerfile": "../Dockerfile",
+    "minMemoryMbytes": 512,
+    "maxMemoryMbytes": 4096
 }

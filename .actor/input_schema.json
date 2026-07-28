@@ -1,20 +1,23 @@
 {
-    "title": "Facebook Post & Comment Scraper input",
+    "title": "Facebook Comment Scraper input",
+    "description": "Free Apify Facebook comments scraper — no login or cookies. Set a page handle or post URL and run.",
     "type": "object",
     "schemaVersion": 1,
     "properties": {
         "pageOrUrl": {
             "title": "Page or post URL",
             "type": "string",
-            "description": "A Facebook page handle/URL/numeric id, OR a single post URL (comments only).",
+            "description": "Facebook page handle (e.g. facebook), page URL, numeric page id, or a single post URL to scrape comments only.",
             "editor": "textfield",
+            "prefill": "facebook",
             "example": "facebook"
         },
         "maxPosts": {
             "title": "Max posts",
             "type": "integer",
-            "description": "Maximum number of recent posts to scrape (ignored for a single post URL).",
-            "default": 20,
+            "description": "Maximum recent posts to scrape when given a page (ignored for a single post URL). Each post's comments are paginated in full, so runtime and proxy cost scale with how many comments the posts have — raise this once you have seen what one post costs on your target page.",
+            "default": 1,
+            "prefill": 1,
             "minimum": 1,
             "maximum": 200
         },
@@ -49,7 +52,7 @@
         "proxyConfiguration": {
             "title": "Proxy",
             "type": "object",
-            "description": "Use Apify residential proxy, sticky per run. With no account involved the IP is the only thing Facebook can throttle, so a residential proxy is the main reliability lever.",
+            "description": "Apify residential proxy (on by default). This is the main reliability lever — the only cost beyond compute on most runs.",
             "editor": "proxy",
             "default": {
                 "useApifyProxy": true,
