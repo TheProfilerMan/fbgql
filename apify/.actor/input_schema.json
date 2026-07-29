@@ -1,13 +1,13 @@
 {
     "title": "Facebook Comment Scraper input",
-    "description": "Free Apify Facebook comments scraper — no login or cookies. Set a page handle or post URL and run.",
+    "description": "Free Apify Facebook comments scraper — no login or cookies. Works with public Pages, profiles, Groups, and single post URLs.",
     "type": "object",
     "schemaVersion": 1,
     "properties": {
         "pageOrUrl": {
-            "title": "Page or post URL",
+            "title": "Page, profile, group, or post URL",
             "type": "string",
-            "description": "Facebook page handle (e.g. facebook), page URL, numeric page id, or a single post URL to scrape comments only.",
+            "description": "Public Facebook Page handle (e.g. facebook / ronaldo), user profile handle or numeric id, full Group URL (https://www.facebook.com/groups/...), or a single post/permalink URL. Private or login-gated targets will fail. If a handle returns 0 posts, try the numeric id or change residential proxy country (see README troubleshooting).",
             "editor": "textfield",
             "prefill": "facebook",
             "example": "facebook"
@@ -15,7 +15,7 @@
         "maxPosts": {
             "title": "Max posts",
             "type": "integer",
-            "description": "Maximum recent posts to scrape when given a page (ignored for a single post URL). Each post's comments are paginated in full, so runtime and proxy cost scale with how many comments the posts have — raise this once you have seen what one post costs on your target page.",
+            "description": "Maximum recent posts to scrape from a Page, profile, or Group feed (ignored for a single post URL). Each post's comments are paginated in full, so runtime and proxy cost scale with how many comments the posts have — raise this once you have seen what one post costs on your target.",
             "default": 1,
             "prefill": 1,
             "minimum": 1,
@@ -52,7 +52,7 @@
         "proxyConfiguration": {
             "title": "Proxy",
             "type": "object",
-            "description": "Apify residential proxy (on by default). This is the main reliability lever — the only cost beyond compute on most runs.",
+            "description": "Apify residential proxy (on by default). Main reliability lever. If runs return 0 posts for a public target, set proxy country to match the audience (or your country) and retry — wrong exits often get empty feeds.",
             "editor": "proxy",
             "default": {
                 "useApifyProxy": true,

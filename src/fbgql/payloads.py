@@ -82,7 +82,7 @@ def posts_payload(
     doc_id: str,
     count: int = 3,
 ) -> dict[str, str]:
-    """Page timeline feed pagination body.
+    """Page/profile timeline feed pagination body.
 
     The modern ``ProfileCometTimelineFeedRefetchQuery`` requires a large, mostly
     static variable set (see ``config.TIMELINE_VARIABLES_BASE``); only count/cursor/id
@@ -95,3 +95,30 @@ def posts_payload(
         "id": user_id,
     }
     return _base_form(c_user, fb_dtsg, doc_id, variables)
+
+
+def group_feed_payload(
+    *,
+    group_id: str,
+    cursor: str | None,
+    c_user: str,
+    fb_dtsg: str,
+    doc_id: str,
+    count: int = 3,
+) -> dict[str, str]:
+    """Public group feed pagination body (``GroupsCometFeedRegularStoriesPaginationQuery``)."""
+    form = _base_form(
+        c_user,
+        fb_dtsg,
+        doc_id,
+        {
+            **config.GROUP_FEED_VARIABLES_BASE,
+            "count": count,
+            "cursor": cursor,
+            "id": group_id,
+        },
+    )
+    form["fb_api_caller_class"] = "RelayModern"
+    form["fb_api_req_friendly_name"] = config.FRIENDLY_GROUP_FEED
+    form["server_timestamps"] = "true"
+    return form

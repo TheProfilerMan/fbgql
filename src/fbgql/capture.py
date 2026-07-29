@@ -118,6 +118,14 @@ def _scroll(driver, times: int, pause: float, seen_ids: set[str], out: list) -> 
 _POST_HREF_MARKERS = ("/posts/", "story_fbid", "/videos/", "pfbid", "/permalink/")
 
 
+def _page_url(page: str) -> str:
+    """Normalize a handle, path, or full Facebook URL into an absolute page URL."""
+    page = (page or "").strip()
+    if page.startswith("http://") or page.startswith("https://"):
+        return page
+    return f"https://www.facebook.com/{page.lstrip('/')}"
+
+
 def _first_post_permalink(driver, captured: list[dict], page: str) -> str | None:
     """Find a post permalink to open (so comment/reply queries fire).
 
@@ -168,8 +176,14 @@ def _first_post_permalink(driver, captured: list[dict], page: str) -> str | None
 # Logical name -> substrings that identify its live friendly_name. Order the matchers
 # so "replies" (Depth1…) is distinguished from top-level "comments"
 # (CommentsListComponents…) — both contain "commentslist", hence the specific needles.
+# ``group_feed`` is separate from ``timeline``: GroupsCometFeed* is not a page/profile
+# timeline query and must not be confused with ProfileCometTimelineFeedRefetchQuery.
 _QUERY_MATCHERS = {
     "timeline": ("timelinefeed", "profilecomettimeline", "pagefeed", "modernpagefeed"),
+    "group_feed": (
+        "groupscometfeedregularstoriespaginationquery",
+        "groupscometfeedregularstoriespagination",
+    ),
     "comments": ("commentslistcomponents", "ufi_comments"),
     "replies": ("depth1comments", "commentreplies", "replieslist"),
 }
@@ -214,8 +228,9 @@ def capture(
                     break
                 time.sleep(2)
 
-        print(f"Loading page feed for {page!r} and scrolling to trigger pagination…")
-        driver.get(f"https://www.facebook.com/{page}")
+        url = _page_url(page)
+        print(f"Loading feed for {page!r} ({url}) and scrolling to trigger pagination…")
+        driver.get(url)
         time.sleep(5)
         _drain_graphql(driver, seen_ids, captured)
         _scroll(driver, feed_scrolls, 2.5, seen_ids, captured)
@@ -245,12 +260,12 @@ def capture(
             json.dump(report, fh, ensure_ascii=False, indent=2)
 
         print(f"\nCaptured {len(captured)} GraphQL POST(s) → {out_path}")
-        for name in ("timeline", "comments", "replies"):
+        for name in ("timeline", "group_feed", "comments", "replies"):
             rec = resolved.get(name)
             if rec:
-                print(f"  {name:9s}: doc_id={rec['doc_id']}  ({rec['friendly_name']})")
+                print(f"  {name:10s}: doc_id={rec['doc_id']}  ({rec['friendly_name']})")
             else:
-                print(f"  {name:9s}: NOT captured")
+                print(f"  {name:10s}: NOT captured")
         return report
     finally:
         driver.quit()

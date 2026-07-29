@@ -1,8 +1,8 @@
 """Orchestration shared by both engines: resolve sessions, discover posts, bin-pack.
 
 The heavy comment scraping is done by the engines (threaded / async). This module
-does the up-front, sequential work once: resolve page id, fetch the post list, resolve
-account sessions, and assign posts to workers.
+does the up-front, sequential work once: resolve page/group id, fetch the post list,
+resolve account sessions, and assign posts to workers.
 """
 
 from __future__ import annotations
@@ -18,6 +18,9 @@ from .models import Account, Post, ScrapeJob, Session
 from .transport.sync_http import SyncTransport
 
 _NUMERIC = re.compile(r"^\d+$")
+_GROUP_URL = re.compile(
+    r"(?:https?://)?(?:www\.)?facebook\.com/groups/([^/?#]+)", re.IGNORECASE
+)
 # Page-id candidate patterns, best-first. The timeline feed query keys on the *feed
 # owner / profile* id (e.g. 100064… for a Page), NOT the classic page id (e.g. 1938…
 # from delegate_page) — the latter returns an empty ``Page`` node. Facebook serves
@@ -28,6 +31,7 @@ _PAGE_ID_PATTERNS = [
     re.compile(r'fb:\\?/\\?/profile\\?/(\d+)'),        # profile App Link — feed-owner id
     re.compile(r'"userID"\s*:\s*"(\d+)"'),             # feed-owner id in the page's own bootstrap
     re.compile(r'"profile_owner"\s*:\s*"(\d+)"'),
+    re.compile(r'"groupID"\s*:\s*"(\d+)"'),            # public group bootstrap
     re.compile(r'fb:\\?/\\?/(?:page|group)\\?/(?:\?id=)?(\d+)'),
     re.compile(r'"delegate_page"\s*:\s*\{\s*"id"\s*:\s*"(\d+)"'),
     re.compile(r'"pageID"\s*:\s*"(\d+)"'),
@@ -61,6 +65,39 @@ class ExecutionPlan:
     meta: dict = field(default_factory=dict)
 
 
+def _classify_target(page: str) -> tuple[str, str]:
+    """Return ``(kind, handle_or_id)`` where kind is ``group`` or ``page``.
+
+    ``page`` covers Facebook Pages and user profiles (same timeline query).
+    """
+    page = (page or "").strip()
+    m = _GROUP_URL.search(page)
+    if m:
+        return "group", m.group(1)
+    # Bare path fragments like "groups/123" from some callers.
+    parts = [p for p in page.replace("https://", "").replace("http://", "").split("/") if p]
+    if "groups" in parts:
+        idx = parts.index("groups")
+        if idx + 1 < len(parts):
+            return "group", parts[idx + 1].split("?")[0]
+    handle = page.rstrip("/").split("/")[-1].split("?")[0]
+    return "page", handle
+
+
+def _candidate_html_urls(page: str, kind: str, handle: str) -> list[str]:
+    """URLs to fetch when resolving a numeric id from HTML."""
+    if kind == "group":
+        return [
+            f"https://www.facebook.com/groups/{handle}",
+            f"https://www.facebook.com/{handle}",
+        ]
+    urls = [f"https://www.facebook.com/{handle}", f"https://www.facebook.com/{handle}/about"]
+    # If the caller passed a full non-group URL, try it first (vanity / profile.php).
+    if page.startswith("http") and page.rstrip("/") not in urls:
+        urls.insert(0, page.split("?")[0])
+    return urls
+
+
 def _resolve_page_id_candidates(page: str, session: Session,
                                 transport: SyncTransport) -> list[str]:
     """All plausible numeric ids for a handle, best-first (feed-owner ids leading).
@@ -69,14 +106,13 @@ def _resolve_page_id_candidates(page: str, session: Session,
     id AND the classic Page id) and only one drives the timeline query — the caller
     probes them against the live query to pick the right one.
     """
-    if _NUMERIC.match(page):
-        return [page]
+    kind, handle = _classify_target(page)
+    if _NUMERIC.match(handle):
+        return [handle]
     from .auth import BROWSER_HEADERS
 
-    handle = page.rstrip("/").split("/")[-1].split("?")[0]
     candidates: list[str] = []
-    for url in (f"https://www.facebook.com/{handle}",
-                f"https://www.facebook.com/{handle}/about"):
+    for url in _candidate_html_urls(page, kind, handle):
         html = transport.get(url, cookies=session.cookies, proxy=session.proxy,
                              headers=BROWSER_HEADERS)
         for pat in _PAGE_ID_PATTERNS:
@@ -88,8 +124,9 @@ def _resolve_page_id_candidates(page: str, session: Session,
             break
     if not candidates:
         raise ValueError(
-            f"Could not resolve numeric page id for {page!r}. "
-            "Pass the page's numeric id directly (--page 123456), or a full post URL."
+            f"Could not resolve numeric id for {page!r}. "
+            "The target may be private or login-gated from this IP — try a residential "
+            "proxy in a matching country, pass the numeric id, or a full post URL."
         )
     return candidates
 
@@ -107,6 +144,17 @@ def _post_id_from_url(url: str) -> str:
     raise ValueError(f"Could not extract post id from {url!r}")
 
 
+def _usable_posts(posts: list[Post]) -> list[Post]:
+    """Drop empty story shells that group feeds interleave with real posts."""
+    out: list[Post] = []
+    for p in posts:
+        if not p.post_id:
+            continue
+        if p.text or p.permalink or p.feedback_id or p.comment_count:
+            out.append(p)
+    return out
+
+
 def _post_timeline(user_id: str, cursor: str | None, job: ScrapeJob, session: Session,
                    transport: SyncTransport, doc_id: str, page_name: str | None):
     """One timeline POST -> (posts, next_cursor). Raises on rejection/stale-query."""
@@ -118,41 +166,59 @@ def _post_timeline(user_id: str, cursor: str | None, job: ScrapeJob, session: Se
     parsed = parsing.fb_json(body)
     parsing.raise_if_rejected(parsed, "timeline")
     parsing.raise_if_doc_id_stale(parsed, "timeline", doc_id)
-    return parsing.parse_posts(body, page_name)
+    posts, next_cursor = parsing.parse_posts(body, page_name)
+    return _usable_posts(posts), next_cursor
 
 
-def _fetch_posts(user_ids: list[str], job: ScrapeJob, session: Session,
-                 transport: SyncTransport, page_name: str | None) -> tuple[list[Post], str | None]:
-    """Fetch the page timeline, returning (posts, the id that actually drove the feed).
+def _post_group_feed(group_id: str, cursor: str | None, job: ScrapeJob, session: Session,
+                     transport: SyncTransport, doc_id: str, page_name: str | None):
+    """One group-feed POST -> (posts, next_cursor)."""
+    data = payloads.group_feed_payload(
+        group_id=group_id, cursor=cursor, c_user=session.c_user,
+        fb_dtsg=session.fb_dtsg, doc_id=doc_id,
+    )
+    body = transport.post_form(
+        _group_feed_headers(group_id), data, session.cookies, session.proxy
+    )
+    parsed = parsing.fb_json(body)
+    parsing.raise_if_rejected(parsed, "group_feed")
+    parsing.raise_if_doc_id_stale(parsed, "group_feed", doc_id)
+    posts, next_cursor = parsing.parse_posts(body, page_name)
+    # Prefer the group_feed connection cursor when present.
+    node = (parsed.get("data") or {}).get("node") or {}
+    page_info = (node.get("group_feed") or {}).get("page_info") or {}
+    if page_info.get("end_cursor"):
+        next_cursor = page_info["end_cursor"]
+    elif page_info.get("has_next_page") is False:
+        next_cursor = None
+    return _usable_posts(posts), next_cursor
 
-    The first page also selects the working id: the page HTML yields several candidate
-    ids and only the feed-owner id returns timeline units — the rest return an empty
-    node — so we try candidates in order until one yields posts.
-    """
-    doc_id = job_registry(job).get("timeline")
+
+def _paginate_feed(
+    fetch_page,
+    ids: list[str],
+    job: ScrapeJob,
+) -> tuple[list[Post], str | None]:
+    """Probe ids until one yields posts, then paginate that id up to max_posts."""
     posts: list[Post] = []
-
     chosen: str | None = None
     cursor: str | None = None
-    for uid in user_ids:
-        page_posts, cursor = _post_timeline(uid, None, job, session, transport, doc_id, page_name)
+    for uid in ids:
+        page_posts, cursor = fetch_page(uid, None)
         if page_posts:
             chosen = uid
             _append_unique(posts, page_posts)
             break
     if chosen is None:
-        # No candidate returned a feed — surface the id we tried for a clear message.
-        return [], (user_ids[0] if user_ids else None)
+        return [], (ids[0] if ids else None)
 
     empty_pages = 0
     while len(posts) < job.max_posts and cursor:
         time.sleep(1)
         try:
-            page_posts, cursor = _post_timeline(chosen, cursor, job, session, transport,
-                                                doc_id, page_name)
+            page_posts, cursor = fetch_page(chosen, cursor)
         except (SessionInvalid, RequestRejected, TransportError):
-            # Blocked / logged-out mid-pagination on a hostile IP — keep the posts we
-            # already collected (page 1+) and let the run proceed rather than losing all.
+            # Blocked mid-pagination — keep what we have.
             break
         if not page_posts:
             empty_pages += 1
@@ -163,6 +229,52 @@ def _fetch_posts(user_ids: list[str], job: ScrapeJob, session: Session,
         empty_pages = 0
         _append_unique(posts, page_posts)
     return posts[: job.max_posts], chosen
+
+
+def _fetch_timeline_posts(user_ids: list[str], job: ScrapeJob, session: Session,
+                          transport: SyncTransport,
+                          page_name: str | None) -> tuple[list[Post], str | None]:
+    doc_id = job_registry(job).get("timeline")
+
+    def _page(uid: str, cursor: str | None):
+        return _post_timeline(uid, cursor, job, session, transport, doc_id, page_name)
+
+    return _paginate_feed(_page, user_ids, job)
+
+
+def _fetch_group_posts(group_ids: list[str], job: ScrapeJob, session: Session,
+                       transport: SyncTransport,
+                       page_name: str | None) -> tuple[list[Post], str | None]:
+    doc_id = job_registry(job).get("group_feed")
+
+    def _page(uid: str, cursor: str | None):
+        return _post_group_feed(uid, cursor, job, session, transport, doc_id, page_name)
+
+    return _paginate_feed(_page, group_ids, job)
+
+
+def _fetch_posts(user_ids: list[str], job: ScrapeJob, session: Session,
+                 transport: SyncTransport, page_name: str | None,
+                 *, prefer_group: bool = False) -> tuple[list[Post], str | None, str]:
+    """Fetch posts from a page/profile timeline and/or a group feed.
+
+    Returns ``(posts, resolved_id, feed_kind)`` where ``feed_kind`` is
+    ``timeline`` or ``group_feed``.
+    """
+    if prefer_group:
+        posts, chosen = _fetch_group_posts(user_ids, job, session, transport, page_name)
+        if posts:
+            return posts, chosen, "group_feed"
+        # Fall back in case the URL looked like a group but the id is a page/profile.
+        posts, chosen = _fetch_timeline_posts(user_ids, job, session, transport, page_name)
+        return posts, chosen, "timeline"
+
+    posts, chosen = _fetch_timeline_posts(user_ids, job, session, transport, page_name)
+    if posts:
+        return posts, chosen, "timeline"
+    # Timeline returned an empty Group/User node — try the group feed query.
+    posts, chosen = _fetch_group_posts(user_ids, job, session, transport, page_name)
+    return posts, chosen, "group_feed"
 
 
 def _append_unique(posts: list[Post], new: list[Post]) -> None:
@@ -180,6 +292,14 @@ def _timeline_headers(user_id: str) -> dict[str, str]:
     headers = dict(config.BASE_HEADERS)
     headers["origin"] = "https://www.facebook.com"
     headers["referer"] = f"https://www.facebook.com/profile.php?id={user_id}"
+    return headers
+
+
+def _group_feed_headers(group_id: str) -> dict[str, str]:
+    headers = dict(config.BASE_HEADERS)
+    headers["origin"] = "https://www.facebook.com"
+    headers["referer"] = f"https://www.facebook.com/groups/{group_id}"
+    headers["x-fb-friendly-name"] = config.FRIENDLY_GROUP_FEED
     return headers
 
 
@@ -216,6 +336,7 @@ def prepare(job: ScrapeJob) -> ExecutionPlan:
 
     workers, _cap = job.resolved_policy()
     page_name = job.page
+    feed_kind = "post_url"
 
     if job.post_url:
         post_id = _post_id_from_url(job.post_url)
@@ -225,8 +346,12 @@ def prepare(job: ScrapeJob) -> ExecutionPlan:
     else:
         if not job.page:
             raise ValueError("ScrapeJob needs either page or post_url")
+        kind, _handle = _classify_target(job.page)
         candidates = _resolve_page_id_candidates(job.page, primary, transport)
-        posts, resolved_id = _fetch_posts(candidates, job, primary, transport, page_name)
+        posts, resolved_id, feed_kind = _fetch_posts(
+            candidates, job, primary, transport, page_name,
+            prefer_group=(kind == "group"),
+        )
         for p in posts:
             if not p.feedback_id:
                 p.feedback_id = feedback_id_for_post(p.post_id)
@@ -250,7 +375,10 @@ def prepare(job: ScrapeJob) -> ExecutionPlan:
         page_name=page_name,
         resolved_page_id=resolved_id,
         meta={"mega_used": mega is not None, "mega_post_id": assignment.mega_post_id,
-              "access_mode": "anonymous" if job.anonymous else "authenticated"},
+              "access_mode": "anonymous" if job.anonymous else "authenticated",
+              "feed_kind": feed_kind, "target_kind": (
+                  "post" if job.post_url else _classify_target(job.page or "")[0]
+              )},
     )
 
 

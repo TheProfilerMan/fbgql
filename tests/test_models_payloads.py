@@ -69,9 +69,25 @@ def test_posts_payload_shape():
     assert any(k.startswith("__relay_internal__pv__") for k in variables)
 
 
+def test_group_feed_payload_shape():
+    p = payloads.group_feed_payload(group_id="GID", cursor=None, c_user="0",
+                                    fb_dtsg="", doc_id="DOC")
+    assert p["doc_id"] == "DOC"
+    assert p["fb_api_req_friendly_name"] == config.FRIENDLY_GROUP_FEED
+    variables = json.loads(p["variables"])
+    assert variables["id"] == "GID"
+    assert variables["cursor"] is None
+    assert variables["feedLocation"] == config.GROUP_FEED_LOCATION
+    assert variables["feedType"] == "DISCUSSION"
+    assert variables["renderLocation"] == "group"
+    assert variables["sortingSetting"] == "TOP_POSTS"
+    assert any(k.startswith("__relay_internal__pv__") for k in variables)
+
+
 def test_doc_id_registry_override(monkeypatch):
     reg = config.DocIdRegistry(overrides={"comments": "OVERRIDDEN"})
     assert reg.get("comments") == "OVERRIDDEN"
     # Env var beats default but not explicit override.
     monkeypatch.setenv("FBGQL_DOC_ID_REPLIES", "FROM_ENV")
     assert config.DocIdRegistry().get("replies") == "FROM_ENV"
+    assert config.DocIdRegistry().get("group_feed") == config._DEFAULT_DOC_IDS["group_feed"]

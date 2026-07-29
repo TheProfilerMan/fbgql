@@ -16,11 +16,13 @@ HOME_URL = "https://www.facebook.com/"
 FRIENDLY_COMMENTS = "CommentsListComponentsPaginationQuery"
 FRIENDLY_REPLIES = "Depth1CommentsListPaginationQuery"
 FRIENDLY_TIMELINE = "ProfileCometTimelineFeedRefetchQuery"
+FRIENDLY_GROUP_FEED = "GroupsCometFeedRegularStoriesPaginationQuery"
 
 # The coverage-critical pagination surface. Permalink dialog reaches far more
 # top-level comments than the dedicated commenting surface.
 FEED_LOCATION = "POST_PERMALINK_DIALOG"
 TIMELINE_FEED_LOCATION = "TIMELINE"
+GROUP_FEED_LOCATION = "GROUP"
 COMMENTS_INTENT_TOKEN = "REVERSE_CHRONOLOGICAL_UNFILTERED_INTENT_V1"
 
 # Critical GraphQL error code returned with empty edges mid-pagination. Retryable.
@@ -47,6 +49,7 @@ _DEFAULT_DOC_IDS: dict[str, str] = {
     "comments": "27806180149070312",   # CommentsListComponentsPaginationQuery (captured 2026-07)
     "replies": "27888228590762910",    # Depth1CommentsListPaginationQuery (captured 2026-07)
     "timeline": "27872654765686759",   # ProfileCometTimelineFeedRefetchQuery (captured 2026-07)
+    "group_feed": "27978034491884997",  # GroupsCometFeedRegularStoriesPaginationQuery (captured 2026-07)
 }
 
 # Provider vars the current UFI comment + reply queries declare as required (both
@@ -104,6 +107,51 @@ TIMELINE_VARIABLES_BASE: dict = {
     "__relay_internal__pv__CometUFISingleLineUFIrelayprovider": False,
     "__relay_internal__pv__relay_provider_comet_ufi_ssr_seo_deferrelayprovider": True,
     "__relay_internal__pv__CometUFI_dedicated_comment_routable_dialog_gkrelayprovider": False,
+    "__relay_internal__pv__ReelsIFUCard_reelsIFULikeCountrelayprovider": False,
+    "__relay_internal__pv__FBReelsIFUTileContent_reelsIFUPlayOnHoverrelayprovider": True,
+    "__relay_internal__pv__GroupsCometGYSJFeedItemHeightrelayprovider": 206,
+    "__relay_internal__pv__ShouldEnableBakedInTextStoriesrelayprovider": False,
+    "__relay_internal__pv__StoriesShouldIncludeFbNotesrelayprovider": True,
+}
+
+# Static half of the group-feed query's variables. Captured 2026-07 from a real
+# browser on a public group (GroupsCometFeedRegularStoriesPaginationQuery). Only
+# ``count``, ``cursor``, and ``id`` vary at runtime.
+GROUP_FEED_VARIABLES_BASE: dict = {
+    "feedLocation": "GROUP",
+    "feedType": "DISCUSSION",
+    "feedbackSource": 0,
+    "filterTopicId": None,
+    "focusCommentID": None,
+    "privacySelectorRenderLocation": "COMET_STREAM",
+    "referringStoryRenderLocation": None,
+    "renderLocation": "group",
+    "scale": 2,
+    "sortingSetting": "TOP_POSTS",
+    "stream_initial_count": 1,
+    "useDefaultActor": False,
+    "__relay_internal__pv__GHLShouldChangeAdIdFieldNamerelayprovider": True,
+    "__relay_internal__pv__GHLShouldChangeSponsoredDataFieldNamerelayprovider": True,
+    "__relay_internal__pv__CometFeedStory_enable_reactor_facepilerelayprovider": False,
+    "__relay_internal__pv__CometFeedStory_enable_social_bubblesrelayprovider": False,
+    "__relay_internal__pv__CometFeedStory_enable_post_permalink_white_space_clickrelayprovider": False,
+    "__relay_internal__pv__CometUFICommentActionLinksRewriteEnabledrelayprovider": True,
+    "__relay_internal__pv__CometUFICommentAvatarStickerAnimatedImagerelayprovider": False,
+    "__relay_internal__pv__IsWorkUserrelayprovider": False,
+    "__relay_internal__pv__TestPilotShouldIncludeDemoAdUseCaserelayprovider": False,
+    "__relay_internal__pv__FBReels_deprecate_short_form_video_context_gkrelayprovider": True,
+    "__relay_internal__pv__FBReels_enable_view_dubbed_audio_type_gkrelayprovider": True,
+    "__relay_internal__pv__CometFeedShareMedia_shouldPrefetchShareImagerelayprovider": False,
+    "__relay_internal__pv__CometImmersivePhotoCanUserDisable3DMotionrelayprovider": False,
+    "__relay_internal__pv__WorkCometIsEmployeeGKProviderrelayprovider": False,
+    "__relay_internal__pv__IsMergQAPollsrelayprovider": False,
+    "__relay_internal__pv__FBReelsMediaFooter_comet_enable_reels_ads_gkrelayprovider": True,
+    "__relay_internal__pv__CometUFIReactionsEnableShortNamerelayprovider": False,
+    "__relay_internal__pv__CometUFICommentAutoTranslationTyperelayprovider": "AUTO_TRANSLATE",
+    "__relay_internal__pv__CometUFIShareActionMigrationrelayprovider": True,
+    "__relay_internal__pv__CometUFISingleLineUFIrelayprovider": True,
+    "__relay_internal__pv__relay_provider_comet_ufi_ssr_seo_deferrelayprovider": True,
+    "__relay_internal__pv__CometUFI_dedicated_comment_routable_dialog_gkrelayprovider": True,
     "__relay_internal__pv__ReelsIFUCard_reelsIFULikeCountrelayprovider": False,
     "__relay_internal__pv__FBReelsIFUTileContent_reelsIFUPlayOnHoverrelayprovider": True,
     "__relay_internal__pv__GroupsCometGYSJFeedItemHeightrelayprovider": 206,

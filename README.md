@@ -8,9 +8,9 @@ Clean-room Facebook **GraphQL** post & comment scraper — usable as a **library
 
 ## What it does
 
-Given a Facebook page (or a single post URL), it fetches recent posts and paginates
-their comments + one level of replies via the private GraphQL API, using the proven
-coverage policy:
+Given a Facebook **Page**, **public profile**, **public Group**, or a single **post URL**,
+it fetches recent posts and paginates their comments + one level of replies via the
+private GraphQL API, using the proven coverage policy:
 
 - permalink `feedLocation` (`POST_PERMALINK_DIALOG`)
 - `1675012` empty-page retry with backoff
@@ -46,8 +46,10 @@ on IP diversity rather than on a supply of healthy accounts.
 dead session, not an anonymous one, and it must not silently degrade. Anonymous applies
 when you pass *no* account (or set `anonymous=True` explicitly).
 
-Login-gated, age-gated, and geo-restricted content and private groups stay unreachable
-anonymously — use authenticated mode for those.
+Login-gated, age-gated, and geo-restricted content and private groups/profiles stay
+unreachable anonymously — use authenticated mode for those. Public groups use a separate
+GraphQL feed query (`GroupsCometFeedRegularStoriesPaginationQuery`). If anonymous handle
+resolution fails for a profile, pass the numeric id or a post URL.
 
 Measured, mechanism, and limits: [`reports/ANONYMOUS_ACCESS_SOLVED_2026-07-28.md`](reports/ANONYMOUS_ACCESS_SOLVED_2026-07-28.md).
 

@@ -83,5 +83,20 @@ async def main() -> None:
                 )
             )
             return
+        except ValueError as exc:
+            await Actor.fail(status_message=str(exc))
+            return
+
+        if scraped == 0 and not is_post:
+            await Actor.fail(
+                status_message=(
+                    f"No posts found for {page_or_url!r}. Common causes: (1) residential "
+                    "proxy country/IP blocked by Facebook — switch Apify proxy country to "
+                    "match the audience (or try another country); (2) private / "
+                    "login-gated profile or group; (3) pass the numeric id or a direct "
+                    "post URL. See the Actor README troubleshooting section."
+                )
+            )
+            return
 
         Actor.log.info(f"Done. Pushed {scraped} posts to the dataset.")

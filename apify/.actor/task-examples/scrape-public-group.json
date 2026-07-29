@@ -1,0 +1,9 @@
+{
+    "title": "Scrape a public Facebook group",
+    "description": "Fetch recent posts and comments from a public Facebook group URL.",
+    "input": {
+        "pageOrUrl": "https://www.facebook.com/groups/2693577247594660",
+        "maxPosts": 1,
+        "profile": "default"
+    }
+}
