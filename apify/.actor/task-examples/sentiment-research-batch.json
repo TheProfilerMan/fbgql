@@ -1,6 +1,6 @@
 {
-    "title": "Sentiment research batch",
-    "description": "Export comment text from 10 recent posts for NLP or sentiment analysis pipelines.",
+    "title": "Export 10 page posts + comments for sentiment",
+    "description": "Free: export 10 page posts + comments for sentiment/NLP. $0 developer fee; only Apify platform usage.",
     "input": {
         "pageOrUrl": "competitor",
         "maxPosts": 10,

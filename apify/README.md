@@ -1,15 +1,15 @@
-# Facebook Comment Scraper — free, no login, no cookies
+# Facebook Page Posts & Comments Scraper — free, no login, no cookies
 
-**This is a free Apify Facebook comments scraper.** Extract public Facebook post
-comments, replies, authors, reaction counts, and timestamps as structured JSON —
-**$0 developer fee from us**. You only pay Apify's small platform usage (compute +
-residential proxy traffic). No Facebook account, login, or cookies required.
+**Free Facebook page posts & comments scraper.** Paste a Page URL or handle — takes
+N recent public posts (`maxPosts`) and scrapes each post's comments and replies.
+Also groups, profiles, and single post URLs. No login. **$0 developer fee; only
+Apify platform usage.**
 
-> Looking for a **free Facebook scraper** on Apify? This Actor scrapes public
-> **pages, profiles, groups, and individual posts** logged out — the same content any
-> anonymous visitor sees. Click **Run**, enter a URL or handle, export to CSV/Excel/JSON.
+> Looking for a **free Facebook page posts & comments scraper**? Paste a Page URL,
+> set `maxPosts`, export posts + comments as JSON/CSV. No login. **$0 developer
+> fee; only Apify platform usage.**
 
-## What can this free Facebook comment scraper do?
+## What can this free Facebook page posts & comments scraper do?
 
 - **Scrape comments and replies** from public **Pages**, **user profiles**, **Groups**,
   or a single **post URL**
@@ -84,20 +84,20 @@ One dataset item per post:
 - **Market research** — collect audience reactions on viral posts
 - **LLM training data** — public comment threads as structured text
 
-## How to use this free Facebook scraper on Apify
+## How to use this free Facebook page posts & comments scraper on Apify
 
 ### Quick start
 
 1. Click **Try for free** / **Run**
 2. Set **Page, profile, group, or post URL** — e.g. `facebook`, a profile handle, a
    `/groups/...` link, or a full post permalink
-3. Leave the defaults (residential proxy on, `maxPosts: 1`)
+3. Leave the defaults (residential proxy on) or set `maxPosts: 5` for a page feed
 4. Start the run — results stream into the **Dataset** tab as each post finishes
 
 Default input:
 
 ```json
-{ "pageOrUrl": "facebook", "maxPosts": 1 }
+{ "pageOrUrl": "facebook", "maxPosts": 5 }
 ```
 
 That's it. No credential step.
@@ -114,21 +114,21 @@ Copy any of these into a new **Task** on this Actor's page (Tasks → Create tas
 
 | Task | Input | Best for |
 |------|-------|----------|
-| Smallest run | `{"pageOrUrl": "facebook", "maxPosts": 1}` | Verify the scraper works |
-| Monitor a page | `{"pageOrUrl": "yourbrand", "maxPosts": 5}` | Daily brand monitoring |
-| Public group | `{"pageOrUrl": "https://www.facebook.com/groups/123...", "maxPosts": 3}` | Group discussion threads |
+| Quick test — 1 page post + comments | `{"pageOrUrl": "facebook", "maxPosts": 1}` | Verify the scraper works |
+| Scrape last 5 page posts + comments | `{"pageOrUrl": "yourbrand", "maxPosts": 5}` | Daily brand monitoring |
+| Scrape public group posts + comments | `{"pageOrUrl": "https://www.facebook.com/groups/123...", "maxPosts": 3}` | Group discussion threads |
 | Public profile | `{"pageOrUrl": "some.public.profile", "maxPosts": 1}` | Profile posts (if visible logged out) |
-| Single viral post | `{"pageOrUrl": "https://www.facebook.com/.../posts/..."}` | Deep-dive one thread |
-| Sentiment batch | `{"pageOrUrl": "competitor", "maxPosts": 10, "profile": "default"}` | Research export |
+| Scrape one Facebook post comments thread | `{"pageOrUrl": "https://www.facebook.com/.../posts/..."}` | Deep-dive one thread |
+| Export 10 page posts + comments for sentiment | `{"pageOrUrl": "competitor", "maxPosts": 10, "profile": "default"}` | Research export |
 
 Pre-made configs live in [`.actor/task-examples/`](.actor/task-examples/) (when developing
 from `apify/`) and [`.actor/task-examples/`](../.actor/task-examples/) (repo-root actor
 definition) — same files, kept in sync.
 
-## Is this Facebook comments scraper free?
+## Is this Facebook page posts & comments scraper free?
 
-**Yes — the Actor itself is 100% free.** We charge **$0** per run, per post, and per
-comment. There is no rental fee and no pay-per-result markup from the developer.
+**Yes — free.** **$0 developer fee; only Apify platform usage.** No rental and no
+pay-per-result markup from the developer.
 
 You only pay **Apify platform usage** — the infrastructure cost of running on Apify:
 
@@ -225,10 +225,11 @@ raise `minIntervalSec`, lower `workers`, or use `tops_only`.
 ## FAQ
 
 **Is this a free Facebook comments scraper on Apify?**
-Yes. Zero developer fee. You only pay Apify platform usage (compute + proxy).
+Yes — free. $0 developer fee; only Apify platform usage (compute + proxy).
 
 **Is this a free Facebook scraper (posts + comments)?**
 Yes for public content — each dataset item includes the post and its comment thread.
+Free. $0 developer fee; only Apify platform usage.
 
 **Do I need a Facebook account?**
 No. The Actor scrapes public content logged out and never asks for credentials.

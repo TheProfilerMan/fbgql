@@ -1,7 +1,7 @@
 """Apify actor entrypoint — a thin adapter over fbgql.Scraper.
 
 Reads the actor input, builds a ScrapeJob, and streams post results to the default
-Dataset. Free to use — no developer fee; users only pay Apify platform usage.
+Dataset. Free — $0 developer fee; only Apify platform usage.
 All scraping logic lives in the fbgql core package.
 """
 

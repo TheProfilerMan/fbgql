@@ -2,7 +2,7 @@
     "actorSpecification": 1,
     "views": {
         "overview": {
-            "title": "Posts overview",
+            "title": "Posts & comments overview",
             "description": "One row per scraped post with coverage.",
             "transformation": {
                 "fields": [

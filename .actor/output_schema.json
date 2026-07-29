@@ -1,12 +1,12 @@
 {
     "actorOutputSchemaVersion": 1,
-    "title": "Facebook Comments Scraper output",
-    "description": "One item per scraped post, each with its comments and replies, stored in the default dataset.",
+    "title": "Facebook Page Posts & Comments Scraper output",
+    "description": "One dataset item per post: post fields + comments and replies.",
     "properties": {
         "comments": {
             "type": "string",
-            "title": "Scraped comments",
-            "description": "All scraped posts with their comments and replies, as dataset items.",
+            "title": "Scraped posts & comments",
+            "description": "Dataset of posts with nested comments and replies.",
             "template": "{{links.apiDefaultDatasetUrl}}/items"
         }
     }

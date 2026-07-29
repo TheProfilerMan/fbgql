@@ -1,9 +1,10 @@
 {
-    "title": "Scrape a public Facebook group",
-    "description": "Fetch recent posts and comments from a public Facebook group URL.",
+    "title": "Scrape public group posts + comments",
+    "description": "Free: scrape public group posts + comments. $0 developer fee; only Apify platform usage.",
     "input": {
         "pageOrUrl": "https://www.facebook.com/groups/2693577247594660",
-        "maxPosts": 1,
-        "profile": "default"
+        "maxPosts": 3,
+        "profile": "default",
+        "engine": "async"
     }
 }
