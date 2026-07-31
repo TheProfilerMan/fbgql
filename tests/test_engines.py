@@ -100,3 +100,19 @@ def test_failing_post_is_isolated_not_deadlocked():
     assert len(results) == 2
     assert all(r.error and "boom" in r.error for r in results)
     assert all(r.total_scraped == 0 for r in results)
+
+
+def test_max_comments_caps_tops_not_skips():
+    engine = ThreadedEngine()
+    engine.transport = _FakeSync()
+    plan = _plan(posts=[
+        Post(post_id="A", feedback_id="fA", text="", permalink=None, comment_count=10),
+    ], workers=1)
+    plan.job.max_comments = 1
+    plan.job.reply_fb_cap = 0  # tops only — cap applies to tops
+    result = engine.run(plan)
+    assert len(result.posts) == 1
+    pr = result.posts[0]
+    assert pr.error is None
+    assert pr.tops == 1
+    assert pr.total_scraped == 1

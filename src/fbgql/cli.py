@@ -4,9 +4,11 @@ from __future__ import annotations
 
 import json
 import sys
+from datetime import datetime, timezone
 
 import click
 
+from .dates import parse_time_bound
 from .models import Account, Profile, ScrapeJob
 
 
@@ -32,6 +34,13 @@ def _load_session(path: str) -> tuple[dict[str, str], str | None]:
     return data, fb_dtsg
 
 
+def _cli_time_bound(value: str | None) -> int | None:
+    try:
+        return parse_time_bound(value)
+    except ValueError as exc:
+        raise click.ClickException(str(exc)) from exc
+
+
 @click.group()
 @click.version_option(package_name="fbgql")
 def main() -> None:
@@ -41,7 +50,8 @@ def main() -> None:
 @main.command()
 @click.option("--page", help="Page handle, URL, or numeric id.")
 @click.option("--post-url", help="Scrape comments for a single post URL instead of a page.")
-@click.option("--posts", "max_posts", default=20, show_default=True, help="Max posts to scrape.")
+@click.option("--posts", "max_posts", default=20, show_default=True,
+              help="Max posts to scrape (ignored when --after/--before is set).")
 @click.option("--profile", type=click.Choice([p.value for p in Profile]), default="default",
               show_default=True)
 @click.option("--engine", type=click.Choice(["threads", "async"]), default="threads",
@@ -49,6 +59,8 @@ def main() -> None:
 @click.option("--workers", type=int, default=None, help="Override worker count.")
 @click.option("--reply-cap", type=int, default=None,
               help="Fetch replies only when a post's FB comment_count < this. 0 = tops only.")
+@click.option("--max-comments", type=int, default=None,
+              help="Stop after this many top-level comments per post (pagination cap).")
 @click.option("--cookies", "cookies_path", default=None,
               help="Path to cookies JSON. Omit to scrape logged-out (the default).")
 @click.option("--anonymous", is_flag=True,
@@ -59,14 +71,30 @@ def main() -> None:
 @click.option("--min-interval", type=float, default=1.0, show_default=True)
 @click.option("--reply-concurrency", type=int, default=2, show_default=True)
 @click.option("--mega-threshold", type=int, default=None, help="Pin heaviest post to a mega account.")
+@click.option("--after", "after_time", default=None,
+              help="Only posts at/after this time (unix seconds or YYYY-MM-DD UTC). "
+                   "With a date filter, --posts is ignored and the feed is walked to the window.")
+@click.option("--before", "before_time", default=None,
+              help="Only posts before this time (unix seconds or YYYY-MM-DD UTC).")
+@click.option("--posts-only", is_flag=True,
+              help="Discover posts only; skip comment/reply scraping.")
 @click.option("--out", "out_path", default=None, help="Write result JSON here (else stdout summary).")
-def scrape(page, post_url, max_posts, profile, engine, workers, reply_cap, cookies_path,
-           anonymous, fb_dtsg, proxy, min_interval, reply_concurrency, mega_threshold, out_path):
+def scrape(page, post_url, max_posts, profile, engine, workers, reply_cap, max_comments,
+           cookies_path, anonymous, fb_dtsg, proxy, min_interval, reply_concurrency,
+           mega_threshold, after_time, before_time, posts_only, out_path):
     """Scrape a page (or a single post) and write results."""
     from .scraper import Scraper
 
     if not page and not post_url:
         raise click.ClickException("provide --page or --post-url")
+
+    after_ts = _cli_time_bound(after_time)
+    before_ts = _cli_time_bound(before_time)
+    if (after_ts is not None or before_ts is not None) and after_ts is None:
+        raise click.ClickException(
+            "date filter needs --after (lower bound) so pagination knows when to stop; "
+            "--posts is ignored while filtering by date"
+        )
 
     # Anonymous by default; pass --cookies to scrape as a real session instead.
     anonymous = anonymous or not cookies_path
@@ -90,11 +118,20 @@ def scrape(page, post_url, max_posts, profile, engine, workers, reply_cap, cooki
         min_interval_sec=min_interval,
         reply_concurrency=reply_concurrency,
         mega_threshold=mega_threshold,
+        after_time=after_ts,
+        before_time=before_ts,
+        posts_only=posts_only,
+        max_comments=max_comments,
+        on_progress=lambda msg: click.echo(msg, err=True),
     )
 
     mode = "anonymous" if anonymous else "authenticated"
+    date_note = ""
+    if after_ts is not None or before_ts is not None:
+        date_note = " · date-filter (max posts ignored)"
     click.echo(f"Scraping {page or post_url} · engine={engine} · profile={profile} "
-               f"· access={mode}…", err=True)
+               f"· access={mode}"
+               f"{' · posts-only' if posts_only else ''}{date_note}…", err=True)
 
     # Stream per-post progress to stderr so a long run visibly advances instead of
     # looking frozen (a full page can grind through thousands of comments silently).
@@ -103,6 +140,18 @@ def scrape(page, post_url, max_posts, profile, engine, workers, reply_cap, cooki
     def _on_post(pr) -> None:
         state["n"] += 1
         state["scraped"] += pr.total_scraped
+        if posts_only:
+            ts = pr.post.created_time
+            when = (
+                datetime.fromtimestamp(ts, tz=timezone.utc).isoformat()
+                if ts is not None else "?"
+            )
+            click.echo(
+                f"  [{state['n']}] post {pr.post.post_id}: {when} · "
+                f"{(pr.post.text or '')[:60]!r}",
+                err=True,
+            )
+            return
         cov = f"{pr.coverage * 100:.0f}%" if pr.post.comment_count else "n/a"
         tag = f" · {pr.error}" if pr.error else ""
         click.echo(
@@ -119,7 +168,7 @@ def scrape(page, post_url, max_posts, profile, engine, workers, reply_cap, cooki
         click.echo(f"Wrote {out_path}", err=True)
 
     # Explain a silent 0-comment outcome (stale comments doc_id, dead session, etc.).
-    if result.posts and result.total_scraped == 0:
+    if not posts_only and result.posts and result.total_scraped == 0:
         err = next((p.error for p in result.posts if p.error), None)
         if err:
             click.echo(f"WARNING: 0 comments scraped — first post error: {err}", err=True)

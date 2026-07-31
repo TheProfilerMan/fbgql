@@ -81,18 +81,22 @@ def posts_payload(
     fb_dtsg: str,
     doc_id: str,
     count: int = 3,
+    after_time: int | None = None,
+    before_time: int | None = None,
 ) -> dict[str, str]:
     """Page/profile timeline feed pagination body.
 
     The modern ``ProfileCometTimelineFeedRefetchQuery`` requires a large, mostly
     static variable set (see ``config.TIMELINE_VARIABLES_BASE``); only count/cursor/id
-    vary per request.
+    (and optional afterTime/beforeTime) vary per request.
     """
     variables = {
         **config.TIMELINE_VARIABLES_BASE,
         "count": count,
         "cursor": cursor,
         "id": user_id,
+        "afterTime": after_time,
+        "beforeTime": before_time,
     }
     return _base_form(c_user, fb_dtsg, doc_id, variables)
 

@@ -16,7 +16,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from . import config
-from .models import Comment, Media, Post, Reply
+from .models import Comment, Media, Post, ReactionTypeCount, Reply
 
 # ---------------------------------------------------------------------------
 # Low-level JSON normalization
@@ -245,16 +245,128 @@ def _extract_media(node: dict[str, Any]) -> Media | None:
     return None
 
 
-def _reaction_count(feedback: dict[str, Any]) -> int:
+# Stable Facebook reaction-type node ids → English keys.
+_REACTION_TYPE_BY_ID: dict[str, str] = {
+    "1635855486666999": "like",
+    "1678524932434102": "love",
+    "613557422527858": "care",
+    "115940531764070": "haha",
+    "478547315650144": "wow",
+    "908563459236177": "sad",
+    "444813342392137": "angry",
+}
+
+
+def _as_int(val: Any) -> int | None:
+    if isinstance(val, bool):
+        return None
+    if isinstance(val, (int, float)):
+        return int(val)
+    if isinstance(val, str):
+        try:
+            return int(val)
+        except ValueError:
+            return None
+    return None
+
+
+def _parse_top_reactions(top: Any) -> list[ReactionTypeCount]:
+    """Parse a ``top_reactions`` connection into typed counts."""
+    if not isinstance(top, dict):
+        return []
+    out: list[ReactionTypeCount] = []
+    for edge in top.get("edges") or []:
+        if not isinstance(edge, dict):
+            continue
+        node = edge.get("node") or {}
+        if not isinstance(node, dict):
+            node = {}
+        rid = str(node.get("id") or "")
+        count = _as_int(edge.get("reaction_count")) or 0
+        if count <= 0 and not rid:
+            continue
+        rtype = _REACTION_TYPE_BY_ID.get(rid, rid or "unknown")
+        name = node.get("localized_name")
+        if isinstance(name, str) and not name.strip():
+            name = None
+        out.append(ReactionTypeCount(type=rtype, count=count, name=name))
+    return out
+
+
+def _reaction_total_from_feedback(feedback: dict[str, Any]) -> int:
+    """Best total reaction count from a comment/reply feedback object."""
     reactors = feedback.get("reactors") or {}
-    for k in ("count_reduced", "count"):
-        val = reactors.get(k)
-        if val is not None:
-            try:
-                return int(val)
-            except (TypeError, ValueError):
-                pass
+    for k in ("count", "count_reduced"):
+        n = _as_int(reactors.get(k))
+        if n is not None:
+            return n
     return 0
+
+
+def _reactions_from_feedback(feedback: dict[str, Any]) -> tuple[int, list[ReactionTypeCount]]:
+    """Return (total, per-type breakdown) for a comment/reply feedback node."""
+    reactions = _parse_top_reactions(feedback.get("top_reactions"))
+    total = _reaction_total_from_feedback(feedback)
+    if total <= 0 and reactions:
+        total = sum(r.count for r in reactions)
+    return total, reactions
+
+
+def _post_reactions(story: dict[str, Any]) -> tuple[int, list[ReactionTypeCount], int]:
+    """Return (reaction_count, reactions, share_count) for a feed story."""
+    reactions: list[ReactionTypeCount] = []
+    # Prefer UFI feedback section (avoids nested comment reaction noise).
+    ufi = ((story.get("comet_sections") or {}).get("feedback") or {})
+    search_roots: list[Any] = [ufi, story.get("feedback") or {}, story]
+
+    for root in search_roots:
+        if not isinstance(root, dict) or not root:
+            continue
+        top = root.get("top_reactions")
+        if top is None:
+            top = deep_find_first(root, "top_reactions")
+        parsed = _parse_top_reactions(top)
+        if parsed:
+            reactions = parsed
+            break
+    if not reactions:
+        for cand in deep_find_all(story, "top_reactions"):
+            parsed = _parse_top_reactions(cand)
+            if parsed:
+                reactions = parsed
+                break
+
+    total = sum(r.count for r in reactions)
+    for root in search_roots:
+        if not isinstance(root, dict) or not root:
+            continue
+        found_total = False
+        for cand in deep_find_all(root, "reaction_count"):
+            if isinstance(cand, dict):
+                n = _as_int(cand.get("count"))
+                if n is not None and n >= total:
+                    total = n
+                    found_total = True
+                    break
+        if found_total:
+            break
+
+    share_count = 0
+    for root in search_roots:
+        if not isinstance(root, dict) or not root:
+            continue
+        for cand in deep_find_all(root, "share_count"):
+            if isinstance(cand, dict):
+                n = _as_int(cand.get("count"))
+            else:
+                n = _as_int(cand)
+            if n is not None:
+                share_count = n
+                break
+        if share_count:
+            break
+
+    return total, reactions, share_count
 
 
 def _comment_from_node(node: dict[str, Any]) -> tuple[Comment, tuple[str | None, str | None]]:
@@ -265,14 +377,16 @@ def _comment_from_node(node: dict[str, Any]) -> tuple[Comment, tuple[str | None,
     created = node.get("created_time")
     comment_id = node.get("legacy_fbid") or node.get("id")
     media = _extract_media(node) if not text else None
+    reaction_count, reactions = _reactions_from_feedback(feedback)
 
     comment = Comment(
         comment_id=str(comment_id) if comment_id is not None else None,
         author=author,
         text=text or "",
-        reaction_count=_reaction_count(feedback),
+        reaction_count=reaction_count,
         created_time=int(created) if isinstance(created, (int, float)) else None,
         media=media,
+        reactions=reactions,
     )
 
     fb_id = feedback.get("id")
@@ -330,6 +444,7 @@ def parse_replies(data: dict[str, Any]) -> list[Reply]:
                 reaction_count=comment.reaction_count,
                 created_time=comment.created_time,
                 media=comment.media,
+                reactions=comment.reactions,
             )
         )
     return replies
@@ -354,6 +469,19 @@ def extract_comment_count(node: dict[str, Any]) -> int:
     return total if isinstance(total, int) else 0
 
 
+def _story_created_time(story: dict[str, Any]) -> int | None:
+    """Unix creation time for a feed story (FB field is ``creation_time``)."""
+    raw = story.get("creation_time")
+    if isinstance(raw, (int, float)):
+        return int(raw)
+    # Dedicated timestamp section — avoid deep search (nested attached stories).
+    ts_story = ((story.get("comet_sections") or {}).get("timestamp") or {}).get("story") or {}
+    nested = ts_story.get("creation_time")
+    if isinstance(nested, (int, float)):
+        return int(nested)
+    return None
+
+
 def _story_to_post(story: dict[str, Any], page_name: str | None) -> Post | None:
     post_id = story.get("post_id") or deep_find_first(story, "post_id")
     if not post_id:
@@ -364,6 +492,7 @@ def _story_to_post(story: dict[str, Any], page_name: str | None) -> Post | None:
     message = deep_find_first(story, "message") or {}
     text = message.get("text") if isinstance(message, dict) else ""
     permalink = deep_find_first(story, "wwwURL") or deep_find_first(story, "url")
+    reaction_count, reactions, share_count = _post_reactions(story)
     return Post(
         post_id=str(post_id),
         feedback_id=feedback_id,
@@ -371,6 +500,10 @@ def _story_to_post(story: dict[str, Any], page_name: str | None) -> Post | None:
         permalink=permalink,
         comment_count=extract_comment_count(story),
         page_name=page_name,
+        created_time=_story_created_time(story),
+        reaction_count=reaction_count,
+        reactions=reactions,
+        share_count=share_count,
     )
 
 

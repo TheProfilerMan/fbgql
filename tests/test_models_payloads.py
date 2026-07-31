@@ -55,11 +55,14 @@ def test_replies_payload_shape():
 
 def test_posts_payload_shape():
     p = payloads.posts_payload(user_id="PID", cursor="CUR", c_user="42",
-                               fb_dtsg="D", doc_id="DOC")
+                               fb_dtsg="D", doc_id="DOC",
+                               after_time=100, before_time=200)
     variables = json.loads(p["variables"])
     assert variables["id"] == "PID"
     assert variables["cursor"] == "CUR"
     assert variables["count"] == 3
+    assert variables["afterTime"] == 100
+    assert variables["beforeTime"] == 200
     assert variables["feedLocation"] == config.TIMELINE_FEED_LOCATION
     assert variables["renderLocation"] == "timeline"
     assert variables["useDefaultActor"] is False

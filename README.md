@@ -84,15 +84,22 @@ Only `AUTH=1`, `login`, and `capture` need a display for the browser step; the d
 anonymous path runs fine in containers.
 
 **Budget the run time.** There is no artificial page cap — comments are paginated to
-exhaustion — so wall-clock scales with how many comments the target has, not with post
-count alone. Don't extrapolate from someone else's page; measure your own. One data point
-for calibration: a single `facebook` (Meta's own page) post, logged out, returned **861
-comments in 295 s** on 2026-07-28 — that page averages ~1 000 comments per post, so it is
-close to a worst case. Use `./run.sh doctor` when you only want to confirm the plumbing.
+exhaustion (unless you set `--max-comments`) — so wall-clock scales with how many comments
+the target has, not with post count alone. Don't extrapolate from someone else's page;
+measure your own. One data point for calibration: a single `facebook` (Meta's own page)
+post, logged out, returned **861 comments in 295 s** on 2026-07-28 — that page averages
+~1 000 comments per post, so it is close to a worst case. Use `./run.sh doctor` when you
+only want to confirm the plumbing.
+
+With `--after` / `--before` (UTC `YYYY-MM-DD` or unix seconds), `--posts` is **ignored**
+and the feed is walked until the date window ends (`--after` is required). Use
+`--posts-only` to discover posts without scraping comments, and `--max-comments N` to stop
+top-level pagination at N per post.
 
 Note that `tops_only` is **not** a speed knob: it sets `workers=1`, so it serialises posts
 and can be *slower* than `default` on a multi-post run despite skipping replies. To trade
-coverage for time, keep the `default` profile and use `--reply-cap` (or lower `--posts`).
+coverage for time, keep the `default` profile and use `--reply-cap` (or lower `--posts` /
+`--max-comments`).
 
 ## Install
 
@@ -114,6 +121,7 @@ job = ScrapeJob(
     max_posts=3,
     profile=Profile.DEFAULT,     # DEFAULT | TOPS_ONLY | FULL_REPLIES
     engine="threads",            # or "async"
+    # Optional: after_time / before_time (unix UTC), max_comments, posts_only
 )
 
 # Authenticated — supply a session for login-gated content
@@ -142,6 +150,10 @@ below.
 # Anonymous (default)
 fbgql scrape --page facebook --posts 3 --profile default \
   --engine threads --out out/result.json
+
+# Date window (max posts ignored) + tops only + comment cap
+fbgql scrape --page facebook --after 2026-07-30 --before 2026-07-31 \
+  --profile tops_only --max-comments 500 --out out/day.json
 
 # Authenticated
 fbgql scrape --page facebook --posts 3 --cookies cookies.json --out out/result.json

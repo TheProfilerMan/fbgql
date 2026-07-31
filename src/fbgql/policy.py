@@ -53,6 +53,22 @@ def want_replies(reply_fb_cap: int | None, fb_comment_count: int) -> bool:
     return fb_comment_count < reply_fb_cap
 
 
+def trim_to_max_comments(
+    comments: list,
+    tokens: list,
+    max_comments: int | None,
+) -> tuple[list, list, bool]:
+    """Trim top-level comments (+ reply tokens) to ``max_comments``.
+
+    Returns ``(comments, tokens, hit_cap)``. ``None`` / negative = no limit.
+    """
+    if max_comments is None or max_comments < 0:
+        return comments, tokens, False
+    if len(comments) <= max_comments:
+        return comments, tokens, False
+    return comments[:max_comments], tokens[:max_comments], True
+
+
 def coverage(scraped: int, fb_count: int) -> float:
     return (scraped / fb_count) if fb_count else 0.0
 

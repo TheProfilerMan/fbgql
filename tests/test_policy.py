@@ -12,6 +12,19 @@ def test_want_replies_semantics():
     assert policy.want_replies(1500, 1500) is False      # at/over cap
 
 
+def test_trim_to_max_comments():
+    comments = list("abcdef")
+    tokens = list(range(6))
+    c, t, hit = policy.trim_to_max_comments(comments, tokens, None)
+    assert (c, t, hit) == (comments, tokens, False)
+    c, t, hit = policy.trim_to_max_comments(comments, tokens, 6)
+    assert (c, t, hit) == (comments, tokens, False)
+    c, t, hit = policy.trim_to_max_comments(comments, tokens, 3)
+    assert c == list("abc") and t == [0, 1, 2] and hit is True
+    c, t, hit = policy.trim_to_max_comments(comments, tokens, 0)
+    assert c == [] and t == [] and hit is True
+
+
 def test_backoff_schedules():
     assert policy.empty_page_backoff_seconds(1) == 3
     assert policy.empty_page_backoff_seconds(20) == 30   # capped

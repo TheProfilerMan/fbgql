@@ -3,7 +3,7 @@
     "views": {
         "overview": {
             "title": "Posts & comments overview",
-            "description": "One row per scraped post with coverage.",
+            "description": "One row per scraped post: coverage, nested_replies_on (true/false), and errors. Post object includes created_time.",
             "transformation": {
                 "fields": [
                     "post",
@@ -11,7 +11,7 @@
                     "replies",
                     "total_scraped",
                     "coverage",
-                    "replies_skipped",
+                    "nested_replies_on",
                     "error"
                 ]
             },
@@ -23,7 +23,7 @@
                     "replies": { "label": "Replies" },
                     "total_scraped": { "label": "Scraped" },
                     "coverage": { "label": "Coverage" },
-                    "replies_skipped": { "label": "Replies skipped" },
+                    "nested_replies_on": { "label": "Nested replies on", "format": "boolean" },
                     "error": { "label": "Error" }
                 }
             }

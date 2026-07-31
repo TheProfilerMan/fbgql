@@ -11,11 +11,21 @@ from .engine import base, get_engine
 from .models import PostResult, Result, ScrapeJob
 
 
+def _posts_only_results(plan: runner.ExecutionPlan) -> list[PostResult]:
+    return [PostResult(post=p) for p in plan.posts]
+
+
 class Scraper:
     """Run a :class:`ScrapeJob`. Selects the engine from ``job.engine``."""
 
     def run(self, job: ScrapeJob, on_post: Callable[[PostResult], None] | None = None) -> Result:
         plan = runner.prepare(job)
+        if job.posts_only:
+            results = _posts_only_results(plan)
+            if on_post is not None:
+                for result in results:
+                    on_post(result)
+            return base.assemble_result(job, plan, results, 0.0)
         engine = get_engine(job.engine)
         if on_post is None:
             return engine.run(plan)
@@ -31,6 +41,9 @@ class Scraper:
     def stream(self, job: ScrapeJob) -> Iterator[PostResult]:
         """Yield each post result as it completes (native for engine='threads')."""
         plan = runner.prepare(job)
+        if job.posts_only:
+            yield from _posts_only_results(plan)
+            return
         yield from get_engine(job.engine).stream(plan)
 
     async def astream(self, job: ScrapeJob) -> AsyncIterator[PostResult]:
@@ -40,6 +53,10 @@ class Scraper:
         the event loop. Works with either engine; true concurrency needs engine='async'.
         """
         plan = await asyncio.to_thread(runner.prepare, job)
+        if job.posts_only:
+            for item in _posts_only_results(plan):
+                yield item
+            return
         engine = get_engine(job.engine)
         astream = getattr(engine, "astream", None)
         if astream is not None:

@@ -21,6 +21,7 @@ from .models import (
     Post,
     PostResult,
     Profile,
+    ReactionTypeCount,
     Reply,
     Result,
     ScrapeJob,
@@ -40,6 +41,7 @@ __all__ = [
     "Comment",
     "Reply",
     "Media",
+    "ReactionTypeCount",
     "SCHEMA_VERSION",
     # errors
     "ScrapeError",

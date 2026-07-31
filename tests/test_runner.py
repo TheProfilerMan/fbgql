@@ -88,3 +88,53 @@ def test_usable_posts_filters_empty_shells():
     ]
     usable = runner._usable_posts(posts)
     assert [p.post_id for p in usable] == ["2"]
+
+
+def test_date_window_ignores_max_posts_cap():
+    from fbgql.models import Post, ScrapeJob
+
+    # Newest-first pages; after=100 keeps ts>=100, before=1000 drops ts>=1000.
+    pages = [
+        ([Post(post_id="a", feedback_id="1", text="a", permalink=None, comment_count=0,
+               created_time=900),
+          Post(post_id="b", feedback_id="1", text="b", permalink=None, comment_count=0,
+               created_time=800)], "c1"),
+        ([Post(post_id="c", feedback_id="1", text="c", permalink=None, comment_count=0,
+               created_time=200),
+          Post(post_id="d", feedback_id="1", text="d", permalink=None, comment_count=0,
+               created_time=50)], None),  # 50 is past after_time → stop
+    ]
+    calls = {"n": 0}
+
+    def fetch(_uid, _cursor):
+        i = calls["n"]
+        calls["n"] += 1
+        return pages[i]
+
+    job = ScrapeJob(max_posts=1, after_time=100, before_time=1000)
+    posts, chosen = runner._paginate_feed(fetch, ["UID"], job)
+    assert chosen == "UID"
+    assert [p.post_id for p in posts] == ["a", "b", "c"]  # d filtered + stop; max_posts=1 ignored
+    assert calls["n"] == 2
+
+
+def test_without_date_window_honors_max_posts():
+    from fbgql.models import Post, ScrapeJob
+
+    pages = [
+        ([Post(post_id="a", feedback_id="1", text="a", permalink=None, comment_count=1,
+               created_time=9),
+          Post(post_id="b", feedback_id="1", text="b", permalink=None, comment_count=1,
+               created_time=8)], "c1"),
+    ]
+    calls = {"n": 0}
+
+    def fetch(_uid, _cursor):
+        i = calls["n"]
+        calls["n"] += 1
+        return pages[i]
+
+    job = ScrapeJob(max_posts=1)
+    posts, _ = runner._paginate_feed(fetch, ["UID"], job)
+    assert [p.post_id for p in posts] == ["a"]
+    assert calls["n"] == 1

@@ -17,6 +17,7 @@ from collections.abc import AsyncIterator, Iterator
 from .. import config, parsing, payloads, policy
 from ..errors import RequestRejected, SessionInvalid, TransportError
 from ..models import Comment, Post, PostResult, Result, ScrapeJob, Session
+from ..progress import emit
 from ..runner import ExecutionPlan
 from ..transport import friendly_headers
 from ..transport.async_http import AsyncTransport
@@ -56,7 +57,7 @@ class AsyncEngine:
                     result = await self._scrape_post(post, session, job, reply_sem, w)
                 except Exception as exc:  # noqa: BLE001
                     result = base.build_post_result(
-                        post, [], replies_skipped=True, elapsed_sec=0.0,
+                        post, [], nested_replies_on=False, elapsed_sec=0.0,
                         worker=w, error=f"{type(exc).__name__}: {exc}",
                     )
                 await out.put(result)
@@ -80,15 +81,25 @@ class AsyncEngine:
         t0 = time.perf_counter()
         _workers, cap = job.resolved_policy()
         do_replies = policy.want_replies(cap, post.comment_count)
+        cap_note = f", max_comments={job.max_comments}" if job.max_comments is not None else ""
+        emit(
+            job,
+            f"[w{worker}] post {post.post_id}: fetching comments "
+            f"(fb_count={post.comment_count}, replies={'yes' if do_replies else 'skip'}{cap_note})…",
+        )
         try:
             comments, tokens = await self._fetch_comments(post, session, job)
         except Exception as exc:  # noqa: BLE001 - isolate a bad post
+            emit(job, f"[w{worker}] post {post.post_id}: comments failed — {type(exc).__name__}")
             return base.build_post_result(
-                post, [], replies_skipped=True, elapsed_sec=time.perf_counter() - t0,
+                post, [], nested_replies_on=False, elapsed_sec=time.perf_counter() - t0,
                 worker=worker, error=f"{type(exc).__name__}: {exc}",
             )
 
         if do_replies:
+            n_tok = sum(1 for fb_id, exp in tokens if fb_id and exp)
+            emit(job, f"[w{worker}] post {post.post_id}: fetching replies for {n_tok}/{len(comments)} tops…")
+            done_replies = 0
             for comment, (fb_id, expansion) in zip(comments, tokens):  # noqa: B905
                 try:
                     replies = await self._fetch_replies(fb_id, expansion, session, job, reply_sem)
@@ -96,9 +107,16 @@ class AsyncEngine:
                     replies = []
                 comment.replies = replies
                 comment.reply_count = len(replies)
+                if fb_id and expansion:
+                    done_replies += 1
+                    if done_replies == 1 or done_replies % 25 == 0 or done_replies == n_tok:
+                        emit(
+                            job,
+                            f"[w{worker}] post {post.post_id}: replies {done_replies}/{n_tok}",
+                        )
 
         return base.build_post_result(
-            post, comments, replies_skipped=not do_replies,
+            post, comments, nested_replies_on=do_replies,
             elapsed_sec=time.perf_counter() - t0, worker=worker,
         )
 
@@ -128,12 +146,14 @@ class AsyncEngine:
                 # Blocked mid-pagination — keep comments so far; re-raise only if the
                 # first page failed (nothing to salvage) so the error is reported.
                 if comments:
+                    emit(job, f"  post {post.post_id}: comment pagination blocked; keeping {len(comments)}")
                     break
                 raise
 
             if not page.comments:
                 if policy.should_retry_empty_page(page.critical_codes, empty_retries, page_index):
                     empty_retries += 1
+                    emit(job, f"  post {post.post_id}: empty comment page, retry {empty_retries}…")
                     await asyncio.sleep(policy.empty_page_backoff_seconds(empty_retries))
                     continue
                 break
@@ -142,6 +162,18 @@ class AsyncEngine:
             tokens.extend(page.reply_tokens)
             page_index += 1
             empty_retries = 0
+            comments, tokens, hit_cap = policy.trim_to_max_comments(
+                comments, tokens, job.max_comments,
+            )
+            emit(
+                job,
+                f"  post {post.post_id}: comment page {page_index} "
+                f"(+{len(page.comments)} → {len(comments)}"
+                f"{f'/{post.comment_count}' if post.comment_count else ''}"
+                f"{' · hit max_comments' if hit_cap else ''})",
+            )
+            if hit_cap:
+                break
 
             cursor = page.page_info.end_cursor
             if not cursor:

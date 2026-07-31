@@ -1,0 +1,12 @@
+{
+    "title": "Posts in a date window (tops only)",
+    "description": "Walk the page feed for one UTC day; tops only; cap at 500 top-level comments. maxPosts is ignored when afterDate/beforeDate are set. $0 developer fee; only Apify platform usage.",
+    "input": {
+        "pageOrUrl": "facebook",
+        "afterDate": "2026-07-30",
+        "beforeDate": "2026-07-31",
+        "profile": "tops_only",
+        "maxComments": 500,
+        "engine": "async"
+    }
+}

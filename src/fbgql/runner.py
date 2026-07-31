@@ -15,6 +15,7 @@ from dataclasses import dataclass, field
 from . import auth, config, parsing, payloads, policy
 from .errors import RequestRejected, SessionInvalid, TransportError
 from .models import Account, Post, ScrapeJob, Session
+from .progress import emit
 from .transport.sync_http import SyncTransport
 
 _NUMERIC = re.compile(r"^\d+$")
@@ -161,6 +162,7 @@ def _post_timeline(user_id: str, cursor: str | None, job: ScrapeJob, session: Se
     data = payloads.posts_payload(
         user_id=user_id, cursor=cursor, c_user=session.c_user,
         fb_dtsg=session.fb_dtsg, doc_id=doc_id,
+        after_time=job.after_time, before_time=job.before_time,
     )
     body = transport.post_form(_timeline_headers(user_id), data, session.cookies, session.proxy)
     parsed = parsing.fb_json(body)
@@ -194,40 +196,114 @@ def _post_group_feed(group_id: str, cursor: str | None, job: ScrapeJob, session:
     return _usable_posts(posts), next_cursor
 
 
+def _uses_date_window(job: ScrapeJob) -> bool:
+    return job.after_time is not None or job.before_time is not None
+
+
+def _post_in_date_range(post: Post, job: ScrapeJob) -> bool:
+    """True if ``post`` falls inside the job's optional [after_time, before_time) window."""
+    if not _uses_date_window(job):
+        return True
+    ts = post.created_time
+    if ts is None:
+        return False
+    if job.after_time is not None and ts < job.after_time:
+        return False
+    if job.before_time is not None and ts >= job.before_time:
+        return False
+    return True
+
+
+def _past_date_window(page_posts: list[Post], job: ScrapeJob) -> bool:
+    """True when the feed (newest-first) has scrolled past ``after_time``."""
+    if job.after_time is None:
+        return False
+    for p in page_posts:
+        if p.created_time is not None and p.created_time < job.after_time:
+            return True
+    return False
+
+
+def _under_post_cap(posts: list[Post], job: ScrapeJob) -> bool:
+    """Whether we should keep paginating under the max_posts cap.
+
+    Date-filtered runs ignore ``max_posts`` and stop on the date window (or end of feed)
+    instead — otherwise a default of 20 would truncate a month of posts.
+    """
+    if _uses_date_window(job):
+        return True
+    return len(posts) < job.max_posts
+
+
 def _paginate_feed(
     fetch_page,
     ids: list[str],
     job: ScrapeJob,
 ) -> tuple[list[Post], str | None]:
-    """Probe ids until one yields posts, then paginate that id up to max_posts."""
+    """Probe ids until one yields posts, then paginate that id.
+
+    Without a date window: stop at ``max_posts``.
+    With ``after_time`` / ``before_time``: keep every in-range post and stop once the
+    (newest-first) feed scrolls older than ``after_time`` (or the cursor ends).
+    ``max_posts`` is ignored while a date window is set.
+    """
     posts: list[Post] = []
     chosen: str | None = None
     cursor: str | None = None
+    feed_page = 0
     for uid in ids:
+        emit(job, f"Probing feed id {uid}…")
         page_posts, cursor = fetch_page(uid, None)
+        feed_page += 1
         if page_posts:
             chosen = uid
-            _append_unique(posts, page_posts)
+            kept = [p for p in page_posts if _post_in_date_range(p, job)]
+            _append_unique(posts, kept)
+            emit(
+                job,
+                f"Feed page {feed_page}: got {len(page_posts)} posts, "
+                f"kept {len(kept)} (total {len(posts)})"
+                + (f", cursor={'yes' if cursor else 'end'}")
+            )
+            if _past_date_window(page_posts, job):
+                emit(job, "Reached end of date window on first feed page")
+                cursor = None
             break
+        emit(job, f"Feed id {uid}: no posts")
     if chosen is None:
         return [], (ids[0] if ids else None)
 
     empty_pages = 0
-    while len(posts) < job.max_posts and cursor:
+    while _under_post_cap(posts, job) and cursor:
         time.sleep(1)
         try:
+            emit(job, f"Fetching feed page {feed_page + 1}…")
             page_posts, cursor = fetch_page(chosen, cursor)
-        except (SessionInvalid, RequestRejected, TransportError):
+            feed_page += 1
+        except (SessionInvalid, RequestRejected, TransportError) as exc:
             # Blocked mid-pagination — keep what we have.
+            emit(job, f"Feed pagination stopped ({type(exc).__name__}); keeping {len(posts)} posts")
             break
         if not page_posts:
             empty_pages += 1
+            emit(job, f"Feed page {feed_page}: empty ({empty_pages}/3)")
             if empty_pages >= 3 or not cursor:
                 break
             time.sleep(2)
             continue
         empty_pages = 0
-        _append_unique(posts, page_posts)
+        kept = [p for p in page_posts if _post_in_date_range(p, job)]
+        _append_unique(posts, kept)
+        emit(
+            job,
+            f"Feed page {feed_page}: got {len(page_posts)} posts, "
+            f"kept {len(kept)} (total {len(posts)})"
+        )
+        if _past_date_window(page_posts, job):
+            emit(job, "Reached end of date window — stopping feed pagination")
+            break
+    if _uses_date_window(job):
+        return posts, chosen
     return posts[: job.max_posts], chosen
 
 
@@ -332,13 +408,16 @@ def prepare(job: ScrapeJob) -> ExecutionPlan:
     """Do the sequential up-front work and return an execution plan for an engine."""
     transport = SyncTransport()
     registry = config.DocIdRegistry()
+    emit(job, "Resolving session…")
     primary, mega = _resolve_sessions(job, transport)
+    emit(job, f"Session ready (access={'anonymous' if job.anonymous or not job.accounts else 'authenticated'})")
 
     workers, _cap = job.resolved_policy()
     page_name = job.page
     feed_kind = "post_url"
 
     if job.post_url:
+        emit(job, f"Single-post mode: {job.post_url}")
         post_id = _post_id_from_url(job.post_url)
         posts = [Post(post_id=post_id, feedback_id=feedback_id_for_post(post_id),
                       text="", permalink=job.post_url, comment_count=0, page_name=page_name)]
@@ -347,7 +426,10 @@ def prepare(job: ScrapeJob) -> ExecutionPlan:
         if not job.page:
             raise ValueError("ScrapeJob needs either page or post_url")
         kind, _handle = _classify_target(job.page)
+        emit(job, f"Resolving numeric id for {job.page!r} ({kind})…")
         candidates = _resolve_page_id_candidates(job.page, primary, transport)
+        emit(job, f"Id candidates: {candidates}")
+        emit(job, "Discovering posts from feed…")
         posts, resolved_id, feed_kind = _fetch_posts(
             candidates, job, primary, transport, page_name,
             prefer_group=(kind == "group"),
@@ -355,6 +437,13 @@ def prepare(job: ScrapeJob) -> ExecutionPlan:
         for p in posts:
             if not p.feedback_id:
                 p.feedback_id = feedback_id_for_post(p.post_id)
+
+    emit(
+        job,
+        f"Discovered {len(posts)} post(s) via {feed_kind}"
+        + (f" (id={resolved_id})" if resolved_id else "")
+        + ("; posts-only — skipping comments" if job.posts_only else "; scraping comments…"),
+    )
 
     assignment = policy.assign_posts(posts, workers, job.mega_threshold)
 

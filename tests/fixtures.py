@@ -23,6 +23,24 @@ COMMENTS_PAGE = json.dumps(
                                     "feedback": {
                                         "id": "fb_comment_1",
                                         "reactors": {"count_reduced": 3},
+                                        "top_reactions": {
+                                            "edges": [
+                                                {
+                                                    "reaction_count": 2,
+                                                    "node": {
+                                                        "id": "1635855486666999",
+                                                        "localized_name": "Like",
+                                                    },
+                                                },
+                                                {
+                                                    "reaction_count": 1,
+                                                    "node": {
+                                                        "id": "1678524932434102",
+                                                        "localized_name": "Love",
+                                                    },
+                                                },
+                                            ]
+                                        },
                                         "expansion_info": {"expansion_token": "exp_tok_1"},
                                     },
                                 }
@@ -94,6 +112,7 @@ TIMELINE_PAGE = json.dumps(
                         {
                             "node": {
                                 "post_id": "999",
+                                "creation_time": 1785434442,
                                 "message": {"text": "a post"},
                                 "feedback": {"id": "post_fb_1"},
                                 "comet_sections": {
@@ -101,7 +120,29 @@ TIMELINE_PAGE = json.dumps(
                                         "story": {
                                             "comment_rendering_instance": {
                                                 "comments": {"total_count": 7}
-                                            }
+                                            },
+                                            "feedback": {
+                                                "reaction_count": {"count": 12, "is_empty": False},
+                                                "share_count": {"count": 2, "is_empty": False},
+                                                "top_reactions": {
+                                                    "edges": [
+                                                        {
+                                                            "reaction_count": 10,
+                                                            "node": {
+                                                                "id": "1635855486666999",
+                                                                "localized_name": "Like",
+                                                            },
+                                                        },
+                                                        {
+                                                            "reaction_count": 2,
+                                                            "node": {
+                                                                "id": "1678524932434102",
+                                                                "localized_name": "Love",
+                                                            },
+                                                        },
+                                                    ]
+                                                },
+                                            },
                                         }
                                     }
                                 },

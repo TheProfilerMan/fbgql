@@ -10,6 +10,7 @@ from __future__ import annotations
 from apify import Actor
 
 from fbgql import Account, Profile, ScrapeJob, Scraper, SessionInvalid
+from fbgql.dates import parse_time_bound
 
 # Heuristic: treat inputs that look like a permalink as a single-post job.
 _POST_MARKERS = ("/posts/", "story_fbid", "/permalink/", "/videos/", "pfbid")
@@ -49,6 +50,24 @@ async def main() -> None:
 
         account = Account.anonymous_account(proxy=proxy_url)
         is_post = _is_post_url(page_or_url)
+
+        # Prefer calendar fields (afterDate/beforeDate). Fall back to legacy unix
+        # afterTime/beforeTime so older API callers keep working.
+        try:
+            after_time = parse_time_bound(inp.get("afterDate", inp.get("afterTime")))
+            before_time = parse_time_bound(inp.get("beforeDate", inp.get("beforeTime")))
+        except ValueError as exc:
+            await Actor.fail(status_message=str(exc))
+            return
+        if (after_time is not None or before_time is not None) and after_time is None:
+            await Actor.fail(
+                status_message=(
+                    "Date filter needs afterDate (lower bound) so pagination knows when "
+                    "to stop. maxPosts is ignored while filtering by date."
+                )
+            )
+            return
+
         job = ScrapeJob(
             page=None if is_post else page_or_url,
             post_url=page_or_url if is_post else None,
@@ -61,6 +80,13 @@ async def main() -> None:
             anonymous=True,
             min_interval_sec=float(inp.get("minIntervalSec", 1.0)),
             mega_threshold=inp.get("megaThreshold"),
+            after_time=after_time,
+            before_time=before_time,
+            posts_only=bool(inp.get("postsOnly", False)),
+            max_comments=(
+                int(inp["maxComments"]) if inp.get("maxComments") is not None else None
+            ),
+            on_progress=lambda msg: Actor.log.info(msg),
         )
 
         Actor.log.info(

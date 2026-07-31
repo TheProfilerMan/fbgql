@@ -8,13 +8,14 @@ public import surface.
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from dataclasses import asdict, dataclass, field
 from enum import Enum
 from typing import Any
 
 # Bump when the output shape changes in a breaking way. Downstream consumers
 # (datasets, backend ingest) should key off this.
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 3
 
 
 class Profile(str, Enum):
@@ -106,6 +107,23 @@ class ScrapeJob:
     min_interval_sec: float = 1.0
     reply_concurrency: int = 2
 
+    # Feed date window (unix seconds). Passed to the timeline query as afterTime/beforeTime
+    # and enforced client-side (inclusive start, exclusive end). When set, ``max_posts`` is
+    # ignored and pagination stops at the window (needs ``after_time`` as the lower bound).
+    # Group feeds only get the client-side filter.
+    after_time: int | None = None
+    before_time: int | None = None
+
+    # Discover posts only — skip comment/reply pagination. Useful for date-range probes.
+    posts_only: bool = False
+
+    # Cap top-level comments scraped per post (pagination stops at this many tops).
+    # None = no limit. Replies (if enabled) are only fetched for the kept tops.
+    max_comments: int | None = None
+
+    # Optional progress callback (CLI/Apify). Not part of the output schema.
+    on_progress: Callable[[str], None] | None = field(default=None, repr=False, compare=False)
+
     def resolved_policy(self) -> tuple[int, int | None]:
         """Return (workers, reply_fb_cap) after applying profile + overrides."""
         prof = self.profile if isinstance(self.profile, Profile) else Profile(self.profile)
@@ -118,7 +136,7 @@ class ScrapeJob:
 
 
 # ---------------------------------------------------------------------------
-# Output schema v1
+# Output schema
 # ---------------------------------------------------------------------------
 
 
@@ -129,6 +147,15 @@ class Media:
 
 
 @dataclass
+class ReactionTypeCount:
+    """One reaction type and how many times it was used."""
+
+    type: str            # like | love | care | haha | wow | sad | angry | or raw FB id
+    count: int
+    name: str | None = None  # localized label from Facebook when present
+
+
+@dataclass
 class Reply:
     comment_id: str | None
     author: str | None
@@ -136,6 +163,7 @@ class Reply:
     reaction_count: int
     created_time: int | None = None
     media: Media | None = None
+    reactions: list[ReactionTypeCount] = field(default_factory=list)
 
 
 @dataclass
@@ -148,6 +176,7 @@ class Comment:
     media: Media | None = None
     reply_count: int = 0
     replies: list[Reply] = field(default_factory=list)
+    reactions: list[ReactionTypeCount] = field(default_factory=list)
 
 
 @dataclass
@@ -158,6 +187,10 @@ class Post:
     permalink: str | None
     comment_count: int
     page_name: str | None = None
+    created_time: int | None = None  # unix seconds; story.creation_time from FB
+    reaction_count: int = 0
+    reactions: list[ReactionTypeCount] = field(default_factory=list)
+    share_count: int = 0
 
 
 @dataclass
@@ -170,7 +203,7 @@ class PostResult:
     replies: int = 0
     total_scraped: int = 0
     coverage: float = 0.0
-    replies_skipped: bool = False
+    nested_replies_on: bool = False  # True when reply threads were fetched for this post
     elapsed_sec: float = 0.0
     worker: int | None = None
     error: str | None = None

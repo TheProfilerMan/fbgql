@@ -22,6 +22,8 @@ def test_parse_comments_page_basic():
     assert first.text == "hello world"
     assert first.reaction_count == 3
     assert first.created_time == 1690000000
+    assert [(r.type, r.count) for r in first.reactions] == [("like", 2), ("love", 1)]
+    assert first.reactions[0].name == "Like"
     # reply tokens are index-aligned
     assert page.reply_tokens[0] == ("fb_comment_1", "exp_tok_1")
 
@@ -101,3 +103,7 @@ def test_parse_posts_and_comment_count():
     assert p.text == "a post"
     assert p.comment_count == 7
     assert p.page_name == "ZainSudan"
+    assert p.created_time == 1785434442
+    assert p.reaction_count == 12
+    assert p.share_count == 2
+    assert [(r.type, r.count) for r in p.reactions] == [("like", 10), ("love", 2)]
