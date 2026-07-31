@@ -34,9 +34,9 @@ def _load_session(path: str) -> tuple[dict[str, str], str | None]:
     return data, fb_dtsg
 
 
-def _cli_time_bound(value: str | None) -> int | None:
+def _cli_time_bound(value: str | None, tz: str | None = None) -> int | None:
     try:
-        return parse_time_bound(value)
+        return parse_time_bound(value, tz=tz)
     except ValueError as exc:
         raise click.ClickException(str(exc)) from exc
 
@@ -72,24 +72,28 @@ def main() -> None:
 @click.option("--reply-concurrency", type=int, default=2, show_default=True)
 @click.option("--mega-threshold", type=int, default=None, help="Pin heaviest post to a mega account.")
 @click.option("--after", "after_time", default=None,
-              help="Only posts at/after this time (unix seconds or YYYY-MM-DD UTC). "
+              help="Only posts at/after this time (unix seconds or YYYY-MM-DD). "
+                   "Calendar dates use --timezone (default UTC). "
                    "With a date filter, --posts is ignored and the feed is walked to the window.")
 @click.option("--before", "before_time", default=None,
-              help="Only posts before this time (unix seconds or YYYY-MM-DD UTC).")
+              help="Only posts before this time (unix seconds or YYYY-MM-DD). "
+                   "Calendar dates use --timezone (default UTC).")
+@click.option("--timezone", "date_timezone", default="UTC", show_default=True,
+              help="Timezone for YYYY-MM-DD bounds: UTC, +3, +03:00, or IANA (e.g. Africa/Khartoum).")
 @click.option("--posts-only", is_flag=True,
               help="Discover posts only; skip comment/reply scraping.")
 @click.option("--out", "out_path", default=None, help="Write result JSON here (else stdout summary).")
 def scrape(page, post_url, max_posts, profile, engine, workers, reply_cap, max_comments,
            cookies_path, anonymous, fb_dtsg, proxy, min_interval, reply_concurrency,
-           mega_threshold, after_time, before_time, posts_only, out_path):
+           mega_threshold, after_time, before_time, date_timezone, posts_only, out_path):
     """Scrape a page (or a single post) and write results."""
     from .scraper import Scraper
 
     if not page and not post_url:
         raise click.ClickException("provide --page or --post-url")
 
-    after_ts = _cli_time_bound(after_time)
-    before_ts = _cli_time_bound(before_time)
+    after_ts = _cli_time_bound(after_time, date_timezone)
+    before_ts = _cli_time_bound(before_time, date_timezone)
     if (after_ts is not None or before_ts is not None) and after_ts is None:
         raise click.ClickException(
             "date filter needs --after (lower bound) so pagination knows when to stop; "

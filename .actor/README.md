@@ -14,8 +14,9 @@ usage.**
 
 - **Scrape comments and replies** from public **Pages**, **user profiles**, **Groups**,
   or a single **post URL**
-- **Date filter** — calendar `afterDate` / `beforeDate` (UTC); walks the feed until the
-  window ends (`maxPosts` ignored while filtering by date)
+- **Date filter** — calendar `afterDate` / `beforeDate` with optional `dateTimezone`
+  (`UTC`, `+3`, `Africa/Khartoum`, …); walks the feed until the window ends
+  (`maxPosts` ignored while filtering by date)
 - **Cap comments per post** — `maxComments` stops top-level pagination at N (heavy
   threads are truncated, not skipped)
 - **Posts only** — discover posts (with `created_time`) without scraping comments
@@ -128,13 +129,14 @@ Default input:
 { "pageOrUrl": "facebook", "maxPosts": 5 }
 ```
 
-Date-window example (all posts on 2026-07-30 UTC; `maxPosts` ignored):
+Date-window example (all posts on 2026-07-31 in UTC+3; `maxPosts` ignored):
 
 ```json
 {
   "pageOrUrl": "yourbrand",
-  "afterDate": "2026-07-30",
-  "beforeDate": "2026-07-31",
+  "afterDate": "2026-07-31",
+  "beforeDate": "2026-08-01",
+  "dateTimezone": "+3",
   "profile": "tops_only"
 }
 ```
@@ -156,16 +158,17 @@ Copy any of these into a new **Task** on this Actor's page (Tasks → Create tas
 |------|-------|----------|
 | Quick test — 1 page post + comments | `{"pageOrUrl": "facebook", "maxPosts": 1}` | Verify the scraper works |
 | Scrape last 5 page posts + comments | `{"pageOrUrl": "yourbrand", "maxPosts": 5}` | Daily brand monitoring |
-| Posts in a date window | `{"pageOrUrl": "yourbrand", "afterDate": "2026-07-30", "beforeDate": "2026-07-31", "profile": "tops_only"}` | Day / range export |
+| Posts in a date window | `{"pageOrUrl": "yourbrand", "afterDate": "2026-07-31", "beforeDate": "2026-08-01", "dateTimezone": "+3", "profile": "tops_only"}` | Day / range export (local TZ) |
 | Cap heavy threads | `{"pageOrUrl": "yourbrand", "maxPosts": 5, "maxComments": 500}` | Bound cost on viral posts |
-| Posts only (no comments) | `{"pageOrUrl": "yourbrand", "afterDate": "2026-07-01", "beforeDate": "2026-08-01", "postsOnly": true}` | Feed inventory / timestamps |
+| Posts only (no comments) | `{"pageOrUrl": "yourbrand", "afterDate": "2026-07-01", "beforeDate": "2026-08-01", "dateTimezone": "+3", "postsOnly": true}` | Feed inventory / timestamps |
 | Scrape public group posts + comments | `{"pageOrUrl": "https://www.facebook.com/groups/123...", "maxPosts": 3}` | Group discussion threads |
 | Public profile | `{"pageOrUrl": "some.public.profile", "maxPosts": 1}` | Profile posts (if visible logged out) |
 | Scrape one Facebook post comments thread | `{"pageOrUrl": "https://www.facebook.com/.../posts/..."}` | Deep-dive one thread |
 | Export 10 page posts + comments for sentiment | `{"pageOrUrl": "competitor", "maxPosts": 10, "profile": "default"}` | Research export |
 
-Pre-made configs live in [`task-examples/`](task-examples/) (this actor definition) and
-[`apify/.actor/task-examples/`](../apify/.actor/task-examples/) — same files, kept in sync.
+Pre-made configs live in [`.actor/task-examples/`](.actor/task-examples/) (when developing
+from `apify/`) and [`.actor/task-examples/`](../.actor/task-examples/) (repo-root actor
+definition) — same files, kept in sync.
 
 ## Is this Facebook page posts & comments scraper free?
 
@@ -220,8 +223,9 @@ infrastructure.
 |-------|----------|-------|
 | `pageOrUrl` | yes | Page/profile handle, group URL, numeric id, or a single post URL |
 | `maxPosts` | no | Max recent posts when scraping a feed (default 1). **Ignored** when `afterDate`/`beforeDate` is set, and for post URLs |
-| `afterDate` | no | Calendar date UTC (`YYYY-MM-DD`) — keep posts on or after this day. **Required** if you use a date filter (lower bound so pagination knows when to stop) |
-| `beforeDate` | no | Calendar date UTC — keep posts strictly before this day (exclusive). Pair with `afterDate` for a day/range |
+| `afterDate` | no | Calendar date (`YYYY-MM-DD`) — keep posts on or after midnight in `dateTimezone`. **Required** if you use a date filter |
+| `beforeDate` | no | Calendar date — keep posts strictly before midnight in `dateTimezone` (exclusive). Pair with `afterDate` for a day/range |
+| `dateTimezone` | no | Timezone for calendar dates: `UTC` (default), `+3`, `+03:00`, or IANA (`Africa/Khartoum`) |
 | `postsOnly` | no | Discover posts only (includes `created_time`); skip comment/reply scraping |
 | `maxComments` | no | Stop after this many **top-level** comments per post; truncate heavy threads |
 | `proxyConfiguration` | no | Apify residential proxy, sticky per run (on by default) — **set country** if runs return 0 posts |
@@ -298,7 +302,8 @@ Yes — pass the post URL as `pageOrUrl`.
 Yes — pass the full `https://www.facebook.com/groups/...` URL (or the numeric group id).
 
 **Can I filter by date?**
-Yes — set `afterDate` and optionally `beforeDate` (calendar pickers, UTC). `maxPosts` is
+Yes — set `afterDate` and optionally `beforeDate` (calendar pickers). Use `dateTimezone`
+(`UTC`, `+3`, `Africa/Khartoum`, …) so midnight matches your local day. `maxPosts` is
 ignored; the feed is walked until the window ends. `afterDate` is required for a date
 filter.
 

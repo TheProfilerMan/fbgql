@@ -52,10 +52,16 @@ async def main() -> None:
         is_post = _is_post_url(page_or_url)
 
         # Prefer calendar fields (afterDate/beforeDate). Fall back to legacy unix
-        # afterTime/beforeTime so older API callers keep working.
+        # afterTime/beforeTime so older API callers keep working. Calendar dates are
+        # midnight in dateTimezone (default UTC); unix values are absolute.
+        date_tz = inp.get("dateTimezone") or "UTC"
         try:
-            after_time = parse_time_bound(inp.get("afterDate", inp.get("afterTime")))
-            before_time = parse_time_bound(inp.get("beforeDate", inp.get("beforeTime")))
+            after_time = parse_time_bound(
+                inp.get("afterDate", inp.get("afterTime")), tz=date_tz
+            )
+            before_time = parse_time_bound(
+                inp.get("beforeDate", inp.get("beforeTime")), tz=date_tz
+            )
         except ValueError as exc:
             await Actor.fail(status_message=str(exc))
             return
@@ -89,9 +95,10 @@ async def main() -> None:
             on_progress=lambda msg: Actor.log.info(msg),
         )
 
+        tz_note = f", dateTimezone={date_tz}" if after_time or before_time else ""
         Actor.log.info(
             f"Scraping {page_or_url} (engine={job.engine}, profile={inp.get('profile')}, "
-            "access=anonymous)"
+            f"access=anonymous{tz_note})"
         )
 
         scraped = 0

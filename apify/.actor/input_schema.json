@@ -61,6 +61,38 @@
                 ]
             }
         },
+        "afterDate": {
+            "title": "Posts on or after",
+            "type": "string",
+            "description": "Calendar date. Keep posts from this day onward (inclusive), using midnight in dateTimezone. Leave empty for no lower bound. Example: pick 2026-07-31 and set \"Posts before\" to 2026-08-01 for that local day only.",
+            "editor": "datepicker",
+            "dateType": "absolute",
+            "pattern": "^(\\d{4})-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])$",
+            "sectionCaption": "Date filter"
+        },
+        "beforeDate": {
+            "title": "Posts before",
+            "type": "string",
+            "description": "Calendar date. Keep posts strictly before this day (exclusive), using midnight in dateTimezone. Leave empty for no upper bound. When using a date filter, afterDate is required so pagination knows when to stop.",
+            "editor": "datepicker",
+            "dateType": "absolute",
+            "pattern": "^(\\d{4})-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])$"
+        },
+        "dateTimezone": {
+            "title": "Date timezone",
+            "type": "string",
+            "description": "Timezone for afterDate/beforeDate midnight. Use UTC (default), an offset like +3 or +03:00, or an IANA name (Africa/Khartoum, Asia/Riyadh). Unix afterTime/beforeTime ignore this.",
+            "default": "UTC",
+            "editor": "textfield",
+            "prefill": "UTC"
+        },
+        "postsOnly": {
+            "title": "Posts only",
+            "type": "boolean",
+            "description": "Discover posts (with created_time) and skip comment/reply scraping. nested_replies_on will be false.",
+            "default": false,
+            "editor": "checkbox"
+        },
         "workers": {
             "title": "Workers (advanced)",
             "type": "integer",
@@ -95,30 +127,6 @@
             "type": "integer",
             "description": "If set, pin the single heaviest post to a dedicated worker.",
             "editor": "number"
-        },
-        "afterDate": {
-            "title": "Posts on or after",
-            "type": "string",
-            "description": "Calendar date (UTC). Keep posts from this day onward (inclusive). Leave empty for no lower bound. Example: pick 2026-07-30 and set \"Posts before\" to 2026-07-31 for that day only.",
-            "editor": "datepicker",
-            "dateType": "absolute",
-            "pattern": "^(\\d{4})-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])$",
-            "sectionCaption": "Date filter"
-        },
-        "beforeDate": {
-            "title": "Posts before",
-            "type": "string",
-            "description": "Calendar date (UTC). Keep posts strictly before this day (exclusive). Leave empty for no upper bound. When using a date filter, afterDate is required so pagination knows when to stop.",
-            "editor": "datepicker",
-            "dateType": "absolute",
-            "pattern": "^(\\d{4})-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])$"
-        },
-        "postsOnly": {
-            "title": "Posts only",
-            "type": "boolean",
-            "description": "Discover posts (with created_time) and skip comment/reply scraping. nested_replies_on will be false.",
-            "default": false,
-            "editor": "checkbox"
         }
     },
     "required": [
