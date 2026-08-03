@@ -9,7 +9,7 @@ the shipped payloads/doc_ids can be updated without guessing.
 
 Requires the optional ``[mint]`` extra (Selenium + Chrome). Not imported by the engine.
 
-    fbgql capture --page facebook --cookies cookies.json --out captured_queries.json
+    fbgql capture --page ronaldo --cookies cookies.json --out captured_queries.json
 """
 
 from __future__ import annotations

@@ -9,8 +9,8 @@
             "type": "string",
             "description": "Page/profile handle, group URL, or post URL. For a Page: scrapes N recent posts then each comment thread. For a post URL: that thread only. Private or login-gated targets will fail. If a handle returns 0 posts, try the numeric id or change residential proxy country (see README troubleshooting).",
             "editor": "textfield",
-            "prefill": "facebook",
-            "example": "facebook"
+            "prefill": "ronaldo",
+            "example": "ronaldo"
         },
         "maxPosts": {
             "title": "Max recent posts from page feed",
@@ -36,6 +36,7 @@
                 "Full replies"
             ],
             "default": "default",
+            "prefill": "tops_only",
             "editor": "select"
         },
         "engine": {
@@ -113,7 +114,8 @@
             "type": "integer",
             "description": "Stop paginating top-level comments after this many per post. Heavy threads are truncated instead of skipped. Leave empty for no limit.",
             "editor": "number",
-            "minimum": 0
+            "minimum": 0,
+            "prefill": 100
         },
         "minIntervalSec": {
             "title": "Min interval seconds (advanced)",

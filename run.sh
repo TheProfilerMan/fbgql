@@ -2,7 +2,7 @@
 #
 # One-command bootstrap + run for local/host use (a machine with a browser).
 #
-#   ./run.sh                       # scrape PAGE (default facebook), logged out
+#   ./run.sh                       # scrape PAGE (default ronaldo), logged out
 #   ./run.sh <page> 30             # page + post count
 #   ./run.sh doctor                # check doc_ids still resolve
 #   AUTH=1 ./run.sh                # scrape with a real session (mints cookies if needed)
@@ -16,7 +16,7 @@
 # It will, on first run: pick Python 3.11+, create .venv, install the package.
 #
 # Override anything via env, e.g.:
-#   PAGE=facebook POSTS=20 PROFILE=default ENGINE=threads OUT=out/result.json ./run.sh
+#   PAGE=ronaldo POSTS=20 PROFILE=default ENGINE=threads OUT=out/result.json ./run.sh
 #
 # NOTE: AUTH=1, `login`, and `capture` need a display for the browser step. The default
 # anonymous path does not, so it works fine in containers.
@@ -42,7 +42,7 @@ while [ "$#" -gt 0 ]; do
     *)  POSITIONAL+=("$1"); shift ;;
   esac
 done
-PAGE="${POSITIONAL[0]:-${PAGE:-facebook}}"
+PAGE="${POSITIONAL[0]:-${PAGE:-ronaldo}}"
 POSTS="${POSITIONAL[1]:-${POSTS:-20}}"
 PROFILE="${PROFILE:-default}"
 ENGINE="${ENGINE:-threads}"

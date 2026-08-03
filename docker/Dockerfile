@@ -3,10 +3,10 @@
 #     docker build -f docker/Dockerfile -t fbgql .
 # Run (anonymous — the default; no credentials needed):
 #     docker run --rm -v "$PWD/out:/data" fbgql \
-#       scrape --page facebook --posts 3 --out /data/out.json
+#       scrape --page ronaldo --posts 3 --out /data/out.json
 # Run authenticated (cookies mounted in) for login-gated content:
 #     docker run --rm -v "$PWD/cookies.json:/data/cookies.json" fbgql \
-#       scrape --page facebook --posts 3 --cookies /data/cookies.json --out /data/out.json
+#       scrape --page ronaldo --posts 3 --cookies /data/cookies.json --out /data/out.json
 FROM python:3.12-slim
 
 WORKDIR /app

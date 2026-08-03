@@ -53,7 +53,7 @@ if __name__ == "__main__":
 
     with open("cookies.json", encoding="utf-8") as fh:
         scrape_and_upload(
-            page="facebook",
+            page="ronaldo",
             cookies=json.load(fh),
             backend_url=os.getenv("DAGEEGA_BACKEND_URL", "http://localhost:3000"),
             api_key=os.getenv("DAGEEGA_API_KEY", ""),

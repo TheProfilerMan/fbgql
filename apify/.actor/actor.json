@@ -9,9 +9,10 @@
     "buildTag": "latest",
     "categories": ["SOCIAL_MEDIA", "DEVELOPER_TOOLS"],
     "exampleRunInput": {
-        "pageOrUrl": "facebook",
-        "maxPosts": 5,
-        "profile": "default",
+        "pageOrUrl": "ronaldo",
+        "maxPosts": 1,
+        "maxComments": 100,
+        "profile": "tops_only",
         "engine": "async"
     },
     "meta": {

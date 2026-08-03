@@ -29,8 +29,8 @@ logged-out actor, so page discovery, full comment pagination, and replies all wo
 no account at all — no browser, no login, no token bootstrap:
 
 ```bash
-fbgql scrape --page facebook --posts 3           # anonymous; nothing to set up
-fbgql scrape --page facebook --cookies c.json    # authenticated, for gated content
+fbgql scrape --page ronaldo --posts 3           # anonymous; nothing to set up
+fbgql scrape --page ronaldo --cookies c.json    # authenticated, for gated content
 ```
 
 Reference runs on the same page and post count: **93.5% weighted coverage anonymous**
@@ -70,7 +70,7 @@ The default path is anonymous, so it needs **no browser and no login**:
 
 ```bash
 ./run.sh doctor           # smoke test — resolves the page + all 3 doc_ids, no scraping
-./run.sh facebook 1       # smallest real scrape, logged out
+./run.sh ronaldo 1       # smallest real scrape, logged out
 
 ./run.sh                  # scrape the default page (PAGE/POSTS defaults), logged out
 ./run.sh <page> 30        # page + post count
@@ -88,7 +88,7 @@ exhaustion (unless you set `--max-comments`) — so wall-clock scales with how m
 the target has, not with post count alone. Don't extrapolate from someone else's page;
 measure your own. One data point for calibration: a single `facebook` (Meta's own page)
 post, logged out, returned **861 comments in 295 s** on 2026-07-28 — that page averages
-~1 000 comments per post, so it is close to a worst case. Use `./run.sh doctor` when you
+~1 000 comments per post, so it is close to a worst case (avoid for demos/quick tests; prefer a quieter page like `ronaldo`). Use `./run.sh doctor` when you
 only want to confirm the plumbing.
 
 With `--after` / `--before` (UTC `YYYY-MM-DD` or unix seconds), `--posts` is **ignored**
@@ -117,7 +117,7 @@ from fbgql import Scraper, ScrapeJob, Account, Profile
 
 # Anonymous (default) — no accounts needed
 job = ScrapeJob(
-    page="facebook",
+    page="ronaldo",
     max_posts=3,
     profile=Profile.DEFAULT,     # DEFAULT | TOPS_ONLY | FULL_REPLIES
     engine="threads",            # or "async"
@@ -126,7 +126,7 @@ job = ScrapeJob(
 
 # Authenticated — supply a session for login-gated content
 job = ScrapeJob(
-    page="facebook",
+    page="ronaldo",
     max_posts=3,
     accounts=[Account(cookies=cookies_dict, proxy="http://user:pass@host:port")],
 )
@@ -148,17 +148,17 @@ below.
 
 ```bash
 # Anonymous (default)
-fbgql scrape --page facebook --posts 3 --profile default \
+fbgql scrape --page ronaldo --posts 3 --profile default \
   --engine threads --out out/result.json
 
 # Date window (max posts ignored) + tops only + comment cap
-fbgql scrape --page facebook --after 2026-07-30 --before 2026-07-31 \
+fbgql scrape --page ronaldo --after 2026-07-30 --before 2026-07-31 \
   --profile tops_only --max-comments 500 --out out/day.json
 
 # Authenticated
-fbgql scrape --page facebook --posts 3 --cookies cookies.json --out out/result.json
+fbgql scrape --page ronaldo --posts 3 --cookies cookies.json --out out/result.json
 
-fbgql doctor --page facebook            # check doc_ids are still valid (logged out)
+fbgql doctor --page ronaldo            # check doc_ids are still valid (logged out)
 fbgql mint-session --out cookies.json   # interactive login (needs [mint] extra)
 ```
 

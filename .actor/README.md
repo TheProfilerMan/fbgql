@@ -31,7 +31,7 @@ usage.**
 
 | Target | Example `pageOrUrl` | Notes |
 |--------|---------------------|-------|
-| **Page** | `ronaldo`, `facebook`, `https://www.facebook.com/ronaldo` | Public Page timeline |
+| **Page** | `ronaldo`, `https://www.facebook.com/ronaldo` | Public Page timeline |
 | **Profile** | `mohamed.ayuop.5` or numeric id `100003173681397` | Only if the profile is visible logged out; some handles need the numeric id |
 | **Group** | `https://www.facebook.com/groups/2693577247594660` | Public groups only |
 | **Post** | `https://www.facebook.com/.../posts/...` or `/permalink/...` | Scrapes that thread only (`maxPosts` / date filter ignored) |
@@ -117,16 +117,21 @@ One dataset item per post (`schema_version` **2**):
 ### Quick start
 
 1. Click **Try for free** / **Run**
-2. Set **Page, profile, group, or post URL** — e.g. `facebook`, a profile handle, a
+2. Set **Page, profile, group, or post URL** — e.g. `ronaldo`, a profile handle, a
    `/groups/...` link, or a full post permalink
-3. Leave the defaults (residential proxy on) or set `maxPosts: 5` for a page feed —
+3. Leave the defaults (residential proxy on) or set `maxPosts` / `maxComments` for a page feed —
    or pick **Posts on or after** / **Posts before** for a date window
 4. Start the run — results stream into the **Dataset** tab as each post finishes
 
 Default input:
 
 ```json
-{ "pageOrUrl": "facebook", "maxPosts": 5 }
+{
+  "pageOrUrl": "ronaldo",
+  "maxPosts": 1,
+  "maxComments": 100,
+  "profile": "tops_only"
+}
 ```
 
 Date-window example (all posts on 2026-07-31 in UTC+3; `maxPosts` ignored):
@@ -156,7 +161,7 @@ Copy any of these into a new **Task** on this Actor's page (Tasks → Create tas
 
 | Task | Input | Best for |
 |------|-------|----------|
-| Quick test — 1 page post + comments | `{"pageOrUrl": "facebook", "maxPosts": 1}` | Verify the scraper works |
+| Quick test — 1 page post + comments | `{"pageOrUrl": "ronaldo", "maxPosts": 1, "maxComments": 100, "profile": "tops_only"}` | Verify the scraper works |
 | Scrape last 5 page posts + comments | `{"pageOrUrl": "yourbrand", "maxPosts": 5}` | Daily brand monitoring |
 | Posts in a date window | `{"pageOrUrl": "yourbrand", "afterDate": "2026-07-31", "beforeDate": "2026-08-01", "dateTimezone": "+3", "profile": "tops_only"}` | Day / range export (local TZ) |
 | Cap heavy threads | `{"pageOrUrl": "yourbrand", "maxPosts": 5, "maxComments": 500}` | Bound cost on viral posts |
@@ -199,14 +204,14 @@ no Apify account needed, no platform charges:
 git clone https://github.com/bsho5/fbgql.git
 cd fbgql
 ./run.sh doctor              # smoke test — checks the API still answers (no login)
-./run.sh facebook 1          # scrape 1 post, anonymous, free
+./run.sh ronaldo 1          # scrape 1 post, anonymous, free
 ```
 
 Or install as a library/CLI:
 
 ```bash
 pip install -e .
-fbgql scrape --page facebook --posts 3 --out out/result.json
+fbgql scrape --page ronaldo --posts 3 --out out/result.json
 
 # Date window (max posts ignored); tops only; cap tops at 500
 fbgql scrape --page yourbrand --after 2026-07-30 --before 2026-07-31 \
