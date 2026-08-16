@@ -1,40 +1,46 @@
 {
     "title": "Facebook Page Posts & Comments Scraper input",
-    "description": "Free page URL → recent posts + comments scraper. No login. Also profiles, groups, and single post URLs. $0 developer fee; only Apify platform usage.",
+    "description": "Private cost-controlled fork for Facebook page monitoring. Supports hard maxPosts, known-post overlap stopping, exact timestamp fallback, and posts/comments scraping.",
     "type": "object",
     "schemaVersion": 1,
     "properties": {
         "pageOrUrl": {
             "title": "Page, profile, group, or post URL",
             "type": "string",
-            "description": "Page/profile handle, group URL, or post URL. For a Page: scrapes N recent posts then each comment thread. For a post URL: that thread only. Private or login-gated targets will fail. If a handle returns 0 posts, try the numeric id or change residential proxy country (see README troubleshooting).",
+            "description": "Facebook Page/profile handle, group URL, or direct post URL.",
             "editor": "textfield",
             "prefill": "ronaldo",
             "example": "ronaldo"
         },
         "maxPosts": {
-            "title": "Max recent posts from page feed",
+            "title": "Hard maximum posts",
             "type": "integer",
-            "description": "How many recent feed posts to scrape (with comments). Ignored when afterDate/beforeDate is set — then the Actor walks the feed until the date window ends. Ignored for a single post URL. Each post's comments are paginated in full, so runtime and proxy cost scale with how many comments the posts have — raise this once you have seen what one post costs on your target.",
-            "default": 1,
-            "prefill": 1,
+            "description": "Absolute ceiling for feed posts returned by this private fork. Monitoring stops earlier when a known post or stopAfterTime boundary is reached.",
+            "default": 10,
+            "prefill": 10,
             "minimum": 1,
-            "maximum": 200
+            "maximum": 50,
+            "sectionCaption": "Cost-controlled monitoring"
+        },
+        "stopPostIds": {
+            "title": "Known post IDs to stop on",
+            "type": "array",
+            "description": "Previously stored Facebook post IDs, newest first. The Actor stops immediately after encountering the first matching ID and includes that post as one overlap.",
+            "editor": "stringList",
+            "default": []
+        },
+        "stopAfterTime": {
+            "title": "Exact previous-run timestamp fallback",
+            "type": "integer",
+            "description": "Unix timestamp in seconds. If no stopPostId is encountered, stop after including the first post at or before this exact timestamp. Do not combine with date filters.",
+            "editor": "number"
         },
         "profile": {
             "title": "Policy profile",
             "type": "string",
-            "description": "default = 3 workers + reply cap 1500 (best quality/time); tops_only = no replies; full_replies = always fetch replies (not recommended).",
-            "enum": [
-                "default",
-                "tops_only",
-                "full_replies"
-            ],
-            "enumTitles": [
-                "Default (recommended)",
-                "Tops only",
-                "Full replies"
-            ],
+            "description": "default = comments/replies; tops_only = no replies; full_replies = always fetch replies.",
+            "enum": ["default", "tops_only", "full_replies"],
+            "enumTitles": ["Default", "Tops only", "Full replies"],
             "default": "default",
             "prefill": "tops_only",
             "editor": "select"
@@ -42,39 +48,34 @@
         "engine": {
             "title": "Engine",
             "type": "string",
-            "description": "async = streaming httpx (recommended on Apify); threads = requests thread pool.",
-            "enum": [
-                "async",
-                "threads"
-            ],
+            "description": "async is recommended on Apify.",
+            "enum": ["async", "threads"],
             "default": "async",
             "editor": "select"
         },
         "proxyConfiguration": {
             "title": "Proxy",
             "type": "object",
-            "description": "Apify residential proxy (on by default). Main reliability lever. If runs return 0 posts for a public target, set proxy country to match the audience (or your country) and retry — wrong exits often get empty feeds.",
+            "description": "Apify residential proxy configuration.",
             "editor": "proxy",
             "default": {
                 "useApifyProxy": true,
-                "apifyProxyGroups": [
-                    "RESIDENTIAL"
-                ]
+                "apifyProxyGroups": ["RESIDENTIAL"]
             }
         },
         "afterDate": {
             "title": "Posts on or after",
             "type": "string",
-            "description": "Calendar date. Keep posts from this day onward (inclusive), using midnight in dateTimezone. Leave empty for no lower bound. Example: pick 2026-07-31 and set \"Posts before\" to 2026-08-01 for that local day only.",
+            "description": "Legacy calendar-date filter. Do not combine with stopPostIds or stopAfterTime.",
             "editor": "datepicker",
             "dateType": "absolute",
             "pattern": "^(\\d{4})-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])$",
-            "sectionCaption": "Date filter"
+            "sectionCaption": "Legacy date filter"
         },
         "beforeDate": {
             "title": "Posts before",
             "type": "string",
-            "description": "Calendar date. Keep posts strictly before this day (exclusive), using midnight in dateTimezone. Leave empty for no upper bound. When using a date filter, afterDate is required so pagination knows when to stop.",
+            "description": "Legacy exclusive calendar-date upper bound.",
             "editor": "datepicker",
             "dateType": "absolute",
             "pattern": "^(\\d{4})-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])$"
@@ -82,7 +83,7 @@
         "dateTimezone": {
             "title": "Date timezone",
             "type": "string",
-            "description": "Timezone for afterDate/beforeDate midnight. Use UTC (default), an offset like +3 or +03:00, or an IANA name (Africa/Khartoum, Asia/Riyadh). Unix afterTime/beforeTime ignore this.",
+            "description": "Timezone used by afterDate/beforeDate.",
             "default": "UTC",
             "editor": "textfield",
             "prefill": "UTC"
@@ -90,48 +91,46 @@
         "postsOnly": {
             "title": "Posts only",
             "type": "boolean",
-            "description": "Discover posts (with created_time) and skip comment/reply scraping. nested_replies_on will be false.",
+            "description": "Discover posts and skip comment/reply scraping.",
             "default": false,
             "editor": "checkbox"
         },
         "workers": {
-            "title": "Workers (advanced)",
+            "title": "Workers",
             "type": "integer",
-            "description": "Override the worker count from the profile.",
+            "description": "Override worker count.",
             "minimum": 1,
             "maximum": 8,
             "editor": "number",
             "sectionCaption": "Advanced"
         },
         "replyFbCap": {
-            "title": "Reply cap (advanced)",
+            "title": "Reply cap",
             "type": "integer",
-            "description": "Fetch replies only when a post's FB comment_count is below this. 0 = tops only.",
+            "description": "Fetch replies only when Facebook comment_count is below this. 0 = tops only.",
             "editor": "number"
         },
         "maxComments": {
             "title": "Max comments per post",
             "type": "integer",
-            "description": "Stop paginating top-level comments after this many per post. Heavy threads are truncated instead of skipped. Leave empty for no limit.",
+            "description": "Maximum top-level comments per post. Leave empty for no limit.",
             "editor": "number",
             "minimum": 0,
             "prefill": 100
         },
         "minIntervalSec": {
-            "title": "Min interval seconds (advanced)",
+            "title": "Min interval seconds",
             "type": "number",
-            "description": "Pause between comment pages, per worker. Higher = gentler on rate limits.",
+            "description": "Pause between comment pages, per worker.",
             "default": 1.0,
             "editor": "number"
         },
         "megaThreshold": {
-            "title": "Mega threshold (advanced)",
+            "title": "Mega threshold",
             "type": "integer",
-            "description": "If set, pin the single heaviest post to a dedicated worker.",
+            "description": "Pin the heaviest post to a dedicated worker when set.",
             "editor": "number"
         }
     },
-    "required": [
-        "pageOrUrl"
-    ]
+    "required": ["pageOrUrl"]
 }
