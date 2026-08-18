@@ -1,11 +1,13 @@
-"""Runtime patch for cost-controlled feed pagination in the private Actor fork.
+"""Runtime patches for cost-controlled monitoring in the private Actor fork.
 
 The upstream library intentionally ignores max_posts when a date window is used.
-This private Actor needs different economics: maxPosts is a hard ceiling, and daily
-monitoring should stop as soon as a previously-seen post or exact timestamp boundary
-is reached.
+This private Actor needs different economics:
+- maxPosts is a hard ceiling;
+- monitoring stops at a previously seen post or exact timestamp boundary;
+- comment-enabled runs collect at most 10 top-level comments per post;
+- replies are always disabled in this private Actor.
 
-Keeping this in the Actor layer makes the fork easy to rebase onto upstream fbgql.
+Keeping these controls in the Actor layer makes the fork easy to rebase onto upstream fbgql.
 """
 
 from __future__ import annotations
@@ -17,6 +19,38 @@ import fbgql.runner as runner
 
 _INSTALLED = False
 _ORIGINAL_PAGINATE_FEED = runner._paginate_feed
+_ORIGINAL_PREPARE = runner.prepare
+_MAX_PRIVATE_COMMENTS = 10
+
+
+def _apply_private_actor_limits(job):
+    """Apply private Actor comment-cost controls before the execution plan is built."""
+    if not hasattr(job, "monitoring_mode"):
+        return job
+
+    if job.posts_only:
+        return job
+
+    requested = job.max_comments
+    if requested is None:
+        effective = _MAX_PRIVATE_COMMENTS
+    else:
+        effective = max(0, min(int(requested), _MAX_PRIVATE_COMMENTS))
+
+    job.max_comments = effective
+    job.reply_fb_cap = 0
+
+    runner.emit(
+        job,
+        f"Private Actor comment controls: max_comments={effective}, replies=off.",
+    )
+    return job
+
+
+def _cost_controlled_prepare(job):
+    """Apply private limits, then delegate to the upstream execution planner."""
+    _apply_private_actor_limits(job)
+    return _ORIGINAL_PREPARE(job)
 
 
 def _append_candidate(
@@ -54,7 +88,7 @@ def _append_candidate(
         runner.emit(
             job,
             f"Exact timestamp boundary reached at post {post.post_id} "
-            f"({post.created_time} <= {stop_after_time}) — stopping."
+            f"({post.created_time} <= {stop_after_time}) — stopping.",
         )
         return True
 
@@ -136,7 +170,7 @@ def _cost_controlled_paginate_feed(fetch_page, ids: list[str], job):
             runner.emit(
                 job,
                 f"Feed page {feed_page}: got {len(page_posts)} posts, "
-                f"kept {len(posts)} total, cursor={'yes' if cursor else 'end'}"
+                f"kept {len(posts)} total, cursor={'yes' if cursor else 'end'}",
             )
             if stopped:
                 cursor = None
@@ -164,7 +198,7 @@ def _cost_controlled_paginate_feed(fetch_page, ids: list[str], job):
             runner.emit(
                 job,
                 f"Feed pagination stopped ({type(exc).__name__}); "
-                f"keeping {len(posts)} posts"
+                f"keeping {len(posts)} posts",
             )
             break
 
@@ -182,7 +216,7 @@ def _cost_controlled_paginate_feed(fetch_page, ids: list[str], job):
         runner.emit(
             job,
             f"Feed page {feed_page}: got {len(page_posts)} posts, "
-            f"kept {len(posts)} total"
+            f"kept {len(posts)} total",
         )
 
     if len(posts) >= max_posts and not job.monitor_boundary_found:
@@ -192,11 +226,12 @@ def _cost_controlled_paginate_feed(fetch_page, ids: list[str], job):
 
 
 def install_monitoring_patch() -> None:
-    """Install the private Actor pagination policy once per process."""
+    """Install the private Actor cost-control policies once per process."""
     global _INSTALLED
 
     if _INSTALLED:
         return
 
     runner._paginate_feed = _cost_controlled_paginate_feed
+    runner.prepare = _cost_controlled_prepare
     _INSTALLED = True
