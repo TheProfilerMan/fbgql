@@ -16,8 +16,8 @@
             "title": "Hard maximum posts",
             "type": "integer",
             "description": "Absolute ceiling for feed posts returned by this private fork. Monitoring stops earlier when a known post or stopAfterTime boundary is reached.",
-            "default": 10,
-            "prefill": 10,
+            "default": 50,
+            "prefill": 50,
             "minimum": 1,
             "maximum": 50,
             "sectionCaption": "Cost-controlled monitoring"
